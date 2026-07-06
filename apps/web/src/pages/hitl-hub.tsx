@@ -424,12 +424,35 @@ export function HitlHub() {
                               <p><strong>Phone:</strong> {tx.phoneNumber || 'N/A'}</p>
                               <p><strong>Date:</strong> {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString() : 'N/A'}</p>
                               <p><strong>Receipt:</strong> {tx.receiptNo || 'N/A'}</p>
+                              {/* Show AI reasoning if available */}
+                              {tx.aiReasoning && (
+                                <details className="mt-2 border-t border-gray-200 pt-2">
+                                  <summary className="text-kenya-amber-600 font-medium cursor-pointer">🤖 AI Reasoning</summary>
+                                  <p className="mt-1 text-gray-600 italic">{tx.aiReasoning}</p>
+                                </details>
+                              )}
                             </div>
                           );
                         } catch { return <pre className="whitespace-pre-wrap">{resolveTask.rawData}</pre>; }
                       })()
                     ) : (
-                      <pre className="whitespace-pre-wrap">{resolveTask.rawData}</pre>
+                      <div>
+                        <pre className="whitespace-pre-wrap">{resolveTask.rawData}</pre>
+                        {(() => {
+                          try {
+                            const data = JSON.parse(resolveTask.rawData);
+                            if (data.aiReasoning) {
+                              return (
+                                <details className="mt-2 border-t border-gray-200 pt-2">
+                                  <summary className="text-kenya-amber-600 font-medium cursor-pointer">🤖 AI Reasoning</summary>
+                                  <p className="mt-1 text-gray-600 italic">{data.aiReasoning}</p>
+                                </details>
+                              );
+                            }
+                          } catch {}
+                          return null;
+                        })()}
+                      </div>
                     )}
                   </div>
                 </details>
