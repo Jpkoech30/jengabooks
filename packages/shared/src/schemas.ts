@@ -1,4 +1,15 @@
 import { z } from 'zod';
+
+/**
+ * Validate a KRA PIN (Kenya Revenue Authority Personal Identification Number)
+ * Format: 11 characters, uppercase alphanumeric, must contain at least one digit
+ * Example: P051234567Z
+ */
+export function isValidKraPin(pin: string | null | undefined): boolean {
+  if (!pin) return false;
+  return /^[A-Z0-9]{11}$/.test(pin) && /[0-9]/.test(pin);
+}
+
 import { CompanyRole, FiscalPeriodStatus, CompanyTier, AccountType, EntryDirection, TaxCode } from './enums';
 
 // User schemas
@@ -80,7 +91,7 @@ export const createFiscalPeriodSchema = z.object({
 // Invoice schemas
 export const createInvoiceSchema = z.object({
   customerName: z.string().min(1).max(200),
-  customerPin: z.string().length(11).optional(),
+  customerPin: z.string().length(11).regex(/^[A-Z0-9]{11}$/, 'KRA PIN must be 11 uppercase alphanumeric characters').optional(),
   customerEmail: z.string().email().optional(),
   lineItems: z.array(z.object({
     description: z.string(),
