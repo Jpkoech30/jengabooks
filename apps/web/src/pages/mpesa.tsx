@@ -36,7 +36,7 @@ export function MpesaImport() {
   const loadTransactions = async () => {
     setLoading(true);
     try {
-      const data = await api.get<{ items: MpesaTx[]; total: number }>('/mpesa/transactions');
+      const data = await api.get<{ items: MpesaTx[]; total: number }>('/mpesa');
       setTransactions(data.items);
     } catch { /* ignore */ } finally { setLoading(false); }
   };
