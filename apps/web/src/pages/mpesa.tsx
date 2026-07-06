@@ -2,7 +2,8 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
-import { api } from '../lib/api-client';
+import { FileUpload } from '../components/ui/file-upload';
+import { api, apiClient } from '../lib/api-client';
 
 interface MpesaTx {
   id: string;
@@ -52,25 +53,34 @@ export function MpesaImport() {
     loadAccounts();
   }, []);
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = async (file: File) => {
     if (!file) return;
     setImporting(true);
     setError(null);
     setResult(null);
     try {
-      const text = await file.text();
-      const data = await api.post<{ imported: number; categorized: number; message: string }>('/mpesa/import', {
-        csvData: text,
-        fileName: file.name,
-      });
-      setResult(data);
+      if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
+        // PDF upload — send as multipart/form-data
+        const formData = new FormData();
+        formData.append('file', file);
+        const data = await apiClient.post<{ imported: number; categorized: number; message: string }>('/mpesa/import/pdf', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        }).then(res => res.data);
+        setResult(data);
+      } else {
+        // CSV upload — send as JSON
+        const text = await file.text();
+        const data = await api.post<{ imported: number; categorized: number; message: string }>('/mpesa/import', {
+          csvData: text,
+          fileName: file.name,
+        });
+        setResult(data);
+      }
       loadTransactions();
     } catch (err: any) {
-      setError(err?.response?.data?.message || 'Failed to import CSV');
+      setError(err?.response?.data?.message || 'Failed to import file');
     } finally {
       setImporting(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -98,27 +108,15 @@ export function MpesaImport() {
           <CardTitle>Upload M-Pesa CSV</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed border-kenya-green-200 rounded-xl dark:border-kenya-green-700">
-            <span className="text-4xl">📱</span>
-            <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
-              Upload your M-Pesa business statement CSV file
+          <div className="flex flex-col gap-4">
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              Upload your M-Pesa CSV or PDF bank statement to import transactions
             </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.txt"
-              onChange={handleFileUpload}
-              className="hidden"
-              id="csv-upload"
-            />
-            <Button
-              variant="secondary"
-              size="lg"
+            <FileUpload
+              accept=".csv,.txt,.pdf,text/csv,application/pdf"
+              onFileSelect={handleFileUpload}
               disabled={importing}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              {importing ? 'Importing...' : 'Choose CSV File'}
-            </Button>
+            />
             {result && (
               <div className="rounded-lg bg-kenya-green-50 p-4 text-sm text-kenya-green-700 dark:bg-kenya-green-900/30 dark:text-kenya-green-300">
                 {result.message}

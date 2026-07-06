@@ -76,6 +76,47 @@ export class MpesaService {
     };
   }
 
+  async bulkCreate(companyId: string, userId: string, transactions: Array<{
+    transactionDate: Date;
+    description: string;
+    amount: number;
+    phoneNumber?: string;
+    receiptNo?: string;
+    paybill?: string;
+  }>, source: string) {
+    const parsedRows = transactions.map((tx) => ({
+      companyId,
+      receiptNo: tx.receiptNo || null,
+      transactionDate: tx.transactionDate,
+      description: tx.description,
+      amount: tx.amount,
+      phoneNumber: tx.phoneNumber || null,
+      paybill: tx.paybill || null,
+      rawCsv: JSON.stringify({ source, ...tx }),
+    }));
+
+    const created = await this.prisma.mpesaTransaction.createManyAndReturn({
+      data: parsedRows,
+    });
+
+    // Auto-categorize using rules
+    const categorized = await this.autoCategorize(companyId, created, userId);
+
+    // Award XP
+    const xpAmount = Math.min(created.length * 2, 25);
+    if (created.length > 0 && userId) {
+      await this.gamificationService.awardXp(userId, companyId, xpAmount, `Imported ${created.length} transactions from ${source}`)
+        .catch(() => {});
+    }
+
+    return {
+      imported: created.length,
+      categorized: categorized.length,
+      source,
+      message: `Successfully imported ${created.length} transactions from ${source}`,
+    };
+  }
+
   async findTransactions(companyId: string, filters?: {
     isReconciled?: boolean;
     page?: number;
