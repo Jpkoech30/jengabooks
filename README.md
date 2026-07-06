@@ -10,6 +10,7 @@
     <img src="https://img.shields.io/badge/Expo_51-000020?style=for-the-badge&logo=expo&logoColor=white" alt="Expo 51" />
     <img src="https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white" alt="Vite" />
     <img src="https://img.shields.io/badge/Turborepo-EF4444?style=for-the-badge&logo=turborepo&logoColor=white" alt="Turborepo" />
+    <img src="https://img.shields.io/badge/Tests-234_✔️-0A5C36?style=for-the-badge" alt="234 Tests" />
   </div>
   <br />
 </div>
@@ -28,6 +29,7 @@
   <a href="#-tech-stack">Tech Stack</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-api-reference">API</a> •
+  <a href="#-testing">Testing</a> •
   <a href="#-deployment">Deployment</a>
 </p>
 
@@ -60,19 +62,23 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
     <td width="50%">
       <h3>📱 M-Pesa Integration</h3>
       <ul>
-        <li>CSV import with smart column fingerprinting</li>
-        <li>Rule-based auto-categorization</li>
-        <li>Reconciliation engine</li>
+        <li>CSV/PDF/XLSX import with smart column fingerprinting</li>
+        <li>Rule-based + AI-powered auto-categorization</li>
+        <li>Reconciliation engine (exact/fuzzy/amount-only matching)</li>
         <li>HITL auto-creation for low-confidence matches</li>
+        <li>3-tier confidence UI (Green ✓ / Amber ~ / Red !)</li>
+        <li>Auto-post journal entries for ≥90% confidence</li>
       </ul>
     </td>
     <td width="50%">
       <h3>🧾 KRA eTIMS</h3>
       <ul>
         <li>Invoice creation & submission</li>
+        <li>KRA PIN format validation (A123456789B)</li>
         <li>Circuit breaker for KRA API failures</li>
         <li>Automatic retry with exponential backoff</li>
         <li>Queue-based async processing</li>
+        <li>VAT calculation (16% Standard, 0% Exempt/Zero-rated)</li>
       </ul>
     </td>
   </tr>
@@ -80,20 +86,22 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
     <td width="50%">
       <h3>🤖 AI Agents (DeepSeek V4)</h3>
       <ul>
+        <li><strong>Reconciliation</strong> — Auto-map transactions to accounts</li>
+        <li><strong>Compliance</strong> — KRA eTIMS & IFRS validation</li>
+        <li><strong>Fraud Detection</strong> — Nightly batch anomaly scanning</li>
         <li><strong>Advisory</strong> — Business insights & recommendations</li>
-        <li><strong>Compliance</strong> — IFRS/KRA compliance checks</li>
-        <li><strong>Fraud Detection</strong> — Anomaly detection on transactions</li>
-        <li><strong>HITL Resolution</strong> — Auto-resolve pending reviews</li>
-        <li><strong>Reconciliation</strong> — Bank/M-Pesa matching</li>
+        <li><strong>HITL Resolution</strong> — Auto-resolve simple conflicts</li>
       </ul>
     </td>
     <td width="50%">
       <h3>🎮 Gamification</h3>
       <ul>
-        <li>XP points for transactions, reports, reviews</li>
         <li>50-level progression system with titles</li>
-        <li>Achievement badges (9 unlockables)</li>
+        <li>9 achievement badges (auto-earned from activity)</li>
+        <li>Sync Streak tracking</li>
+        <li>Early Bird XP bonus (reports before 5th)</li>
         <li>Company-wide leaderboards</li>
+        <li>Flawless Finisher trophy (lockdown ceremony)</li>
       </ul>
     </td>
   </tr>
@@ -103,8 +111,10 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
       <ul>
         <li>Full journal entry management</li>
         <li>Chart of accounts with hierarchy</li>
-        <li>Fiscal period enforcement</li>
+        <li>Fiscal period enforcement with lockdown ceremony</li>
         <li>Trial balance, P&L, balance sheet, cash flow</li>
+        <li>Recurring journal entry templates</li>
+        <li>Period-over-period comparison with variance</li>
       </ul>
     </td>
     <td width="50%">
@@ -114,6 +124,28 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
         <li>Row-Level Security on every query</li>
         <li>Company switcher for multi-entity users</li>
         <li>Team management with granular permissions</li>
+      </ul>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%">
+      <h3>🔄 Monthly Workflow</h3>
+      <ul>
+        <li>5-phase bookkeeping tracker: Data → Categorize → Reconcile → Close → Report</li>
+        <li>Real-time progress bar per client</li>
+        <li>Phase-by-phase action links</li>
+        <li>Automated status detection from live data</li>
+      </ul>
+    </td>
+    <td width="50%">
+      <h3>📊 Reporting</h3>
+      <ul>
+        <li>Profit & Loss, Balance Sheet, Cash Flow</li>
+        <li>Bank-grade loan application format</li>
+        <li>Period-over-period comparison</li>
+        <li>CSV export with nested data handling</li>
+        <li>Shareable report links (24-hour expiry)</li>
+        <li>Duplicate payment detection</li>
       </ul>
     </td>
   </tr>
@@ -150,8 +182,8 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
 │    └─────────────┘ └──────────────┘ └──────────────────┘        │
 │                                                                   │
 │    ┌──────────────────────┐  ┌──────────────────────────┐        │
-│    │ 📤 BullMQ Queues     │  │ 🔌 Socket.io Gateway     │        │
-│    │ Sync · AI · eTIMS    │  │ Real-time · Notifications │        │
+│    │ Reconciliation       │  │ Batch/QA                 │        │
+│    │ Matching Engine      │  │ Nightly Fraud Detection  │        │
 │    └──────────────────────┘  └──────────────────────────┘        │
 │                                                                   │
 ├────────────────────────┬─────────────────────────────────────────┤
@@ -179,42 +211,42 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
   <tbody>
     <tr>
       <td><strong>Runtime</strong></td>
-      <td><img src="https://img.shields.io/badge/Node.js_24-339933?logo=nodedotjs&logoColor=white" alt="Node.js" /></td>
+      <td>Node.js 20+</td>
       <td>JavaScript runtime with TypeScript strict mode</td>
     </tr>
     <tr>
       <td><strong>Backend</strong></td>
-      <td><img src="https://img.shields.io/badge/NestJS_10-E0234E?logo=nestjs&logoColor=white" alt="NestJS" /></td>
+      <td>NestJS 10</td>
       <td>Modular server framework with DI, guards, interceptors</td>
     </tr>
     <tr>
       <td><strong>Database</strong></td>
-      <td><img src="https://img.shields.io/badge/PostgreSQL_15-4169E1?logo=postgresql&logoColor=white" alt="PostgreSQL" /> + pgvector</td>
+      <td>PostgreSQL 15 + pgvector</td>
       <td>Primary data store with Row-Level Security</td>
     </tr>
     <tr>
       <td><strong>ORM</strong></td>
-      <td><img src="https://img.shields.io/badge/Prisma_5-2D3748?logo=prisma&logoColor=white" alt="Prisma" /></td>
+      <td>Prisma 5</td>
       <td>Type-safe database access & migrations</td>
     </tr>
     <tr>
       <td><strong>Cache & Queue</strong></td>
-      <td><img src="https://img.shields.io/badge/Redis_7-FF4438?logo=redis&logoColor=white" alt="Redis" /> + BullMQ</td>
+      <td>Redis 7 + BullMQ</td>
       <td>Job queues, rate limiting, circuit breaker state</td>
     </tr>
     <tr>
       <td><strong>AI</strong></td>
-      <td><img src="https://img.shields.io/badge/DeepSeek_V4-4F46E5?logo=deepseek&logoColor=white" alt="DeepSeek" /></td>
+      <td>DeepSeek V4</td>
       <td>5 specialized AI agents (Pro + Flash models)</td>
     </tr>
     <tr>
       <td><strong>Web Frontend</strong></td>
-      <td><img src="https://img.shields.io/badge/React_18-61DAFB?logo=react&logoColor=black" alt="React" /> + Vite + TailwindCSS</td>
+      <td>React 18 + Vite + TailwindCSS</td>
       <td>SPA dashboard with responsive design</td>
     </tr>
     <tr>
       <td><strong>Mobile</strong></td>
-      <td><img src="https://img.shields.io/badge/Expo_51-000020?logo=expo&logoColor=white" alt="Expo" /> + NativeWind</td>
+      <td>Expo 51 + NativeWind</td>
       <td>Cross-platform mobile app</td>
     </tr>
     <tr>
@@ -224,7 +256,7 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
     </tr>
     <tr>
       <td><strong>Real-time</strong></td>
-      <td><img src="https://img.shields.io/badge/Socket.io-010101?logo=socketdotio&logoColor=white" alt="Socket.io" /></td>
+      <td>Socket.io</td>
       <td>Live notifications & sync events</td>
     </tr>
     <tr>
@@ -234,8 +266,13 @@ JengaBooks is a **multi-tenant accounting SaaS** purpose-built for the Kenyan ma
     </tr>
     <tr>
       <td><strong>Monorepo</strong></td>
-      <td><img src="https://img.shields.io/badge/Turborepo-EF4444?logo=turborepo&logoColor=white" alt="Turborepo" /></td>
+      <td>Turborepo</td>
       <td>Workspace orchestration & caching</td>
+    </tr>
+    <tr>
+      <td><strong>Testing</strong></td>
+      <td>Jest 29 + Supertest</td>
+      <td>Unit, integration, and E2E testing</td>
     </tr>
   </tbody>
 </table>
@@ -255,24 +292,29 @@ jengabooks/
 │   │   └── src/
 │   │       ├── common/         # Decorators, filters, interceptors
 │   │       ├── config/         # Database, Redis configuration
-│   │       ├── modules/        # Feature modules
+│   │       ├── modules/        # Feature modules (13 total)
 │   │       │   ├── auth/       # JWT auth, refresh, switch-company
-│   │       │   ├── ledger/     # Journal entries, accounts, periods
-│   │       │   ├── mpesa/      # CSV import, categorization
-│   │       │   ├── etims/      # KRA invoice submission
-│   │       │   ├── ai/         # 5 DeepSeek AI agents
+│   │       │   ├── ledger/     # Journal entries, accounts, periods, recurring
+│   │       │   ├── mpesa/      # CSV/PDF import, categorization, file parser
+│   │       │   ├── etims/      # KRA invoice submission, circuit breaker
+│   │       │   ├── ai/         # 5 DeepSeek AI agents + batch service
 │   │       │   ├── hitl/       # Human-in-the-Loop reviews
-│   │       │   ├── gamification/# XP, levels, badges, leaderboard
-│   │       │   ├── reports/    # P&L, Balance Sheet, Cash Flow
+│   │       │   ├── gamification/# XP, levels, badges, streaks, leaderboard
+│   │       │   ├── reports/    # P&L, Balance Sheet, Cash Flow, comparisons
+│   │       │   ├── reconciliation/ # Transaction matching engine
 │   │       │   ├── sync/       # Offline sync endpoints
-│   │       │   └── tenants/    # Multi-tenant management
+│   │       │   ├── tenants/    # Multi-tenant management
+│   │       │   ├── wizard/     # Onboarding wizard
+│   │       │   ├── health-score/ # Business health scoring
+│   │       │   └── workflow/   # Workflow dashboard logic
 │   │       ├── prisma/         # Prisma service module
-│   │       └── queues/         # BullMQ queue definitions
+│   │       ├── queues/         # BullMQ queue definitions
+│   │       └── e2e/            # End-to-end integration tests
 │   │
 │   ├── web/                    # 🌐 Web Frontend
 │   │   └── src/
 │   │       ├── components/     # UI components, forms, layout
-│   │       ├── pages/          # Route pages (12 routes)
+│   │       ├── pages/          # Route pages (13 routes)
 │   │       ├── hooks/          # React Query hooks
 │   │       ├── stores/         # Zustand state stores
 │   │       └── lib/            # API client, types, utils
@@ -287,8 +329,9 @@ jengabooks/
 │
 ├── packages/
 │   └── shared/                 # 📦 Shared Package
-│       └── src/                # Types, Zod schemas, RBAC, theme
+│       └── src/                # Types, Zod schemas, RBAC, theme, helpers
 │
+├── plans/                      # 📋 Architecture plans & audit docs
 ├── docker-compose.yml          # 🐳 Local dev (Postgres + Redis)
 ├── turbo.json                  # ⚡ Turborepo configuration
 └── package.json                # 📋 Monorepo root
@@ -304,10 +347,10 @@ jengabooks/
 
 | Tool | Version | Required for |
 |------|---------|-------------|
-| <img src="https://img.shields.io/badge/Node.js-20+-339933?logo=nodedotjs&logoColor=white" /> | >= 20.0.0 | Runtime |
-| <img src="https://img.shields.io/badge/npm-11-FF4438?logo=npm&logoColor=white" /> | 11.x | Package management |
-| <img src="https://img.shields.io/badge/PostgreSQL-15-4169E1?logo=postgresql&logoColor=white" /> | 15+ | Database |
-| <img src="https://img.shields.io/badge/Redis-7-FF4438?logo=redis&logoColor=white" /> | 7+ | Queues & caching |
+| Node.js | >= 20.0.0 | Runtime |
+| npm | 11.x | Package management |
+| PostgreSQL | 15+ | Database |
+| Redis | 7+ | Queues & caching |
 
 ### 🏁 One-time Setup
 
@@ -335,8 +378,6 @@ npm run dev
 ```
 
 ### 🖥️ Without Docker
-
-If you have PostgreSQL and Redis installed natively:
 
 ```bash
 # 1. Create the database
@@ -366,6 +407,62 @@ cd ../.. && npm run dev
 
 ---
 
+## 🧪 Testing
+
+The project has **234 tests** across **24 test suites**.
+
+### Test Types
+
+| Type | Count | What It Tests |
+|------|-------|---------------|
+| **Unit** (pure logic) | ~120 | Static methods, DTO validation, calculations, level thresholds, file parsing |
+| **Integration** (mocked DB) | ~100 | Services with mocked Prisma: auth, ledger, HITL, reports, reconciliation |
+| **E2E** (HTTP + real DB) | 14 | Full request/response cycle: register, login, auth flows |
+
+### Test Coverage by Module
+
+| Module | Tests | Key Features Tested |
+|--------|-------|---------------------|
+| Auth | 16 | Login, register, refresh, profile, DTO validation |
+| Ledger | 34 | Accounts CRUD, journal entries, trial balance, serial numbers, recurring entries, lockdown |
+| eTIMS | 22 | Invoices, VAT, KRA PIN validation, submissions, circuit breaker |
+| M-Pesa | 75 | CSV parsing, file formats, bank templates, AI agents, auto-post, bulk approve, upload validation |
+| HITL | 7 | Create, assign, resolve with XP |
+| Reports | 24 | P&L, Balance Sheet, Cash Flow, period comparison, duplicates, share tokens |
+| Gamification | 20 | Level calculation, sync streaks, early bird, level-up detection |
+| Tenants | 6 | CRUD, member management, invite |
+| Wizard | 6 | Progress tracking, step completion |
+| AI Batch | 5 | Nightly fraud detection |
+| Exception Filter | 6 | Prisma errors, HTTP errors |
+| Circuit Breaker | 6 | State transitions, timeout, reset |
+| Confidence Tier | 8 | 3-tier confidence logic |
+| Reconciliation | 11 | Matching engine (exact/fuzzy), status |
+| Workflow | 5 | 5-phase progress calculation |
+| **Total** | **234** | |
+
+### Running Tests
+
+```bash
+# All unit + integration tests
+cd apps/api && npm test
+
+# Watch mode
+cd apps/api && npm run test:watch
+
+# With coverage
+cd apps/api && npm run test:cov
+
+# Specific module
+cd apps/api && npx jest --verbose --testPathPattern="mpesa"
+
+# E2E tests (requires database)
+cd apps/api && npx jest --config jest-e2e.config.ts
+```
+
+<br />
+
+---
+
 ## 🌐 API Reference
 
 All endpoints are prefixed with `/api/v1` and protected with JWT authentication (except login & register).
@@ -374,8 +471,8 @@ All endpoints are prefixed with `/api/v1` and protected with JWT authentication 
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/auth/login` | Sign in with email + password |
-| `POST` | `/api/v1/auth/register` | Create account + company |
+| `POST` | `/api/v1/auth/login` | Sign in with email + password (5 req/min) |
+| `POST` | `/api/v1/auth/register` | Create account + company (3 req/min) |
 | `POST` | `/api/v1/auth/refresh` | Refresh JWT token |
 | `POST` | `/api/v1/auth/logout` | Clear session |
 | `GET` | `/api/v1/auth/profile` | Get user profile + memberships |
@@ -398,7 +495,7 @@ All endpoints are prefixed with `/api/v1` and protected with JWT authentication 
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| `POST` | `/api/v1/mpesa/import` | Import CSV transactions |
+| `POST` | `/api/v1/mpesa/import` | Import CSV/XLSX/PDF transactions |
 | `GET` | `/api/v1/mpesa` | List transactions |
 | `POST` | `/api/v1/mpesa/:txId/map` | Map to account |
 
@@ -416,6 +513,7 @@ All endpoints are prefixed with `/api/v1` and protected with JWT authentication 
 |--------|----------|-------------|
 | `POST` | `/api/v1/ai/process` | Trigger AI processing |
 | `POST` | `/api/v1/ai/feedback` | Submit feedback |
+| `POST` | `/api/v1/ai/batch/fraud-detection` | Manual fraud batch run |
 
 ### 👤 HITL (Human-in-the-Loop)
 
@@ -443,6 +541,12 @@ All endpoints are prefixed with `/api/v1` and protected with JWT authentication 
 | `GET` | `/api/v1/reports/trial-balance` | Trial balance |
 | `GET` | `/api/v1/reports/cash-flow` | Cash flow statement |
 
+### 📋 Workflow
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `GET` | `/api/v1/workflow` | Monthly workflow progress (all 5 phases) |
+
 <br />
 
 ---
@@ -463,14 +567,23 @@ All endpoints are prefixed with `/api/v1` and protected with JWT authentication 
 
 | Badge | Trigger | XP |
 |-------|---------|----|
-| 📚 **Accountant** | Set up Chart of Accounts | 25 |
-| 📱 **M-Pesa Connected** | Connect M-Pesa number | 25 |
-| 📊 **Data Driven** | Import first CSV | 25 |
+| 📚 **Accountant** | Set up Chart of Accounts (5+ accounts) | 25 |
+| 📱 **M-Pesa Connected** | M-Pesa transactions exist | 25 |
+| 📊 **Data Driven** | Import first M-Pesa CSV | 25 |
 | 💰 **First Income** | Record first income | 25 |
 | 💳 **First Expense** | Record first expense | 25 |
-| 🛡️ **Tax Compliant** | Submit first eTIMS invoice | 50 |
-| 👥 **Team Player** | Invite team member | 25 |
-| 📈 **Analyst** | Generate first report | 25 |
+| 🛡️ **Tax Compliant** | Submit first eTIMS invoice (ACCEPTED) | 50 |
+| 👥 **Team Player** | Invite a team member | 25 |
+| 📈 **Analyst** | Generate first report (5+ entries) | 25 |
+| 🤖 **Trust the AI** | Bulk approve 10+ AI-categorized transactions | 25 |
+
+### Streaks & Bonuses
+
+| Mechanic | Trigger | Reward |
+|----------|---------|--------|
+| **Sync Streak** | Consecutive days of activity | Badge at 7/30/90 days |
+| **Early Bird** | Submit reports before 5th of month | +50 XP |
+| **Flawless Finisher** | Complete lockdown with 0 errors | Trophy badge |
 
 <br />
 
@@ -492,11 +605,27 @@ All endpoints are prefixed with `/api/v1` and protected with JWT authentication 
 
 ---
 
+## 🔧 Environment Variables
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | ✅ | — | PostgreSQL connection string |
+| `PORT` | ❌ | `3000` | API server port |
+| `JWT_SECRET` | ✅ | — | JWT signing secret |
+| `REDIS_HOST` | ❌ | `localhost` | Redis host |
+| `REDIS_PORT` | ❌ | `6379` | Redis port |
+| `DEEPSEEK_API_KEY` | ⚠️ | — | Required for AI features |
+| `KRA_API_URL` | ❌ | — | KRA eTIMS API endpoint (mock used if unset) |
+| `KRA_CLIENT_ID` | ⚠️ | — | Required for eTIMS |
+| `CORS_ORIGIN` | ❌ | `http://localhost:5173` | Allowed CORS origin |
+
+<br />
+
+---
+
 ## ☁️ Deployment
 
-Target: **Vultr Johannesburg** (South Africa)
-
-### Tier 1 — Single VM
+### Tier 1 — Single VM (Vultr Johannesburg)
 
 ```bash
 docker-compose -f docker-compose.prod.yml up -d
@@ -519,22 +648,33 @@ Vultr Managed Redis      → Cluster
 Vultr Object Storage     → Backups
 ```
 
+### Environment Configuration for Production
+
+```bash
+# Required for production
+NODE_ENV=production
+JWT_SECRET=<strong-random-secret>
+DATABASE_URL=postgresql://user:password@vultr-db:5432/jengabooks
+
+# For AI features (optional, degrades gracefully if unset)
+DEEPSEEK_API_KEY=sk-your-key
+KRA_API_URL=https://kra-api.go.ke/v1
+KRA_CLIENT_ID=your-client-id
+```
+
 <br />
 
 ---
 
-## 📝 Environment Variables
+## 📚 Additional Documentation
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `DATABASE_URL` | ✅ | — | PostgreSQL connection string |
-| `PORT` | ❌ | `3000` | API server port |
-| `JWT_SECRET` | ✅ | — | JWT signing secret |
-| `REDIS_HOST` | ❌ | `localhost` | Redis host |
-| `REDIS_PORT` | ❌ | `6379` | Redis port |
-| `DEEPSEEK_API_KEY` | ⚠️ | — | Required for AI features |
-| `KRA_CLIENT_ID` | ⚠️ | — | Required for eTIMS |
-| `CORS_ORIGIN` | ❌ | `http://localhost:5173` | Allowed CORS origin |
+| Document | Location | Description |
+|----------|----------|-------------|
+| Audit Report | [`plans/jengabooks-comprehensive-audit.md`](plans/jengabooks-comprehensive-audit.md) | Full project audit with 24 issues |
+| Test Strategy | [`plans/jengabooks-test-strategy.md`](plans/jengabooks-test-strategy.md) | 158-test plan across 5 phases |
+| Workflow Spec | [`plans/acct-workflow-gap-analysis.md`](plans/acct-workflow-gap-analysis.md) | Kenyan accounting workflow specification |
+| Gap Analysis | [`plans/acct-workflow-roadmap.md`](plans/acct-workflow-roadmap.md) | 6-phase implementation roadmap |
+| Pricing Spec | [`plans/accontingspecs.md`](plans/accontingspecs.md) | Full accounting feature specification |
 
 <br />
 
@@ -547,6 +687,11 @@ Vultr Object Storage     → Backups
 3. Commit changes (`git commit -m 'feat: add amazing feature'`)
 4. Push to branch (`git push origin feat/amazing-feature`)
 5. Open a Pull Request
+
+**Before submitting:** Run the test suite and ensure all tests pass.
+```bash
+cd apps/api && npm test
+```
 
 <br />
 
