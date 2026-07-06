@@ -60,65 +60,77 @@ export class PdfParserService {
     const transactions: ExtractedTransaction[] = [];
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // M-Pesa merchant statement format (tabular):
-    // Receipt No | Completion Time | Details | Status | Paid in | Withdrawn | Balance | Type | Other Party
-    // UG61DA7OCU | 2026-07-06 20:01:44 | Merchant Payment from 254725***414 - Name | Completed | 400.00 | 0.00 | ...
+    // M-Pesa merchant statement — text is concatenated across PDF table cells:
+    // Line 1: "UG61DA7OCU2026-07-06" (receiptNo + date, no delimiter)
+    // Line 2: "20:01:44" (time)
+    // Lines 3-5+: description (wrapped text)
+    // Amount line: "Completed400.000.00114,891.09Customer" (status + paidIn + withdrawn + balance + type)
+    // Following lines: more description / other party info
 
-    // Each transaction has 2 lines: receipt+date line, then details line
-    let receiptBuffer = '';
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Check for receipt number (e.g., UG61DA7OCU, SG7ABC)
-      const receiptMatch = line.match(/^([A-Z0-9]{8,12})\s+(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2})/);
-      if (receiptMatch) {
-        receiptBuffer = receiptMatch[1];
-        const dateTimeStr = receiptMatch[2]; // "2026-07-06 20:01:44"
+      // Detect receipt line: 8-12 uppercase alphanumeric chars followed immediately by a date
+      // e.g., "UG61DA7OCU2026-07-06" then next line is "20:01:44"
+      const receiptMatch = line.match(/^([A-Z0-9]{8,12})(\d{4}-\d{2}-\d{2})$/);
+      if (!receiptMatch) continue;
 
-        // Look ahead for the details line (next line or next lines)
-        // Also look for "Paid in" and "Withdrawn" values
-        // The details might be scattered across lines after the receipt
-        let details = '';
-        let paidIn = 0;
-        let withdrawn = 0;
+      const receiptNo = receiptMatch[1];
+      const dateStr = receiptMatch[2]; // "2026-07-06"
 
-        // Collect details from following lines until we hit another receipt or summary
-        for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
-          const nextLine = lines[j];
+      // Next line should be time: "20:01:44"
+      const timeLine = lines[i + 1] || '';
+      const timeMatch = timeLine.match(/^(\d{2}:\d{2}:\d{2})$/);
+      if (!timeMatch) continue;
 
-          // Stop if we hit another receipt
-          if (/^[A-Z0-9]{8,12}\s+\d{4}-\d{2}-\d{2}/.test(nextLine)) break;
-          // Stop if we hit "Summary" or totals
-          if (/^(Total|Summary)/i.test(nextLine)) break;
+      const dateTimeStr = `${dateStr}T${timeMatch[1]}`; // "2026-07-06T20:01:44"
 
-          // Look for "Paid in" and "Withdrawn" amounts
-          // Format: Completed | 400.00 | 0.00 | 114,891.09
-          const amountMatch = nextLine.match(/(?:Completed|Failed)\s*\|\s*([\d,]+\.?\d*)\s*\|\s*([\d,]+\.?\d*)/);
-          if (amountMatch) {
-            paidIn = parseFloat(amountMatch[1].replace(/,/g, ''));
-            withdrawn = parseFloat(amountMatch[2].replace(/,/g, ''));
-          }
+      // Collect description from subsequent lines
+      let description = '';
+      let amount = 0;
 
-          // Collect description text (skip pure numbers/dates)
-          if (!/^[\d,.\s]+$/.test(nextLine) && !/^\d{4}-\d{2}-\d{2}/.test(nextLine) && !nextLine.includes('|')) {
-            details += (details ? ' ' : '') + nextLine;
+      for (let j = i + 2; j < Math.min(i + 10, lines.length); j++) {
+        const nextLine = lines[j];
+
+        // If we hit another receipt, stop
+        if (/^[A-Z0-9]{8,12}\d{4}-\d{2}-\d{2}$/.test(nextLine)) break;
+        // If we hit a time, stop (next receipt's time)
+        if (/^\d{2}:\d{2}:\d{2}$/.test(nextLine)) break;
+        // Skip summary/total lines
+        if (/^(Total|Summary)/i.test(nextLine)) break;
+
+        // Check for amount line: "Completed400.000.00114,891.09Customer"
+        // Pattern: status (Completed/Failed) + paidIn + withdrawn + balance + text
+        const amountMatch = nextLine.match(
+          /(?:Completed|Failed)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/
+        );
+        if (amountMatch) {
+          // Extract the amount before the line (description)
+          const paidIn = parseFloat(amountMatch[1].replace(/,/g, ''));
+          const withdrawn = parseFloat(amountMatch[2].replace(/,/g, ''));
+          amount = paidIn || withdrawn;
+
+          // Any text before the status word in this line belongs to description
+          const descPrefix = nextLine.split(/Completed|Failed/i)[0]?.trim();
+          if (descPrefix) description += (description ? ' ' : '') + descPrefix;
+        } else {
+          // This is a description continuation line
+          // Skip pure numbers, dates, times
+          if (!/^[\d,.\s]+$/.test(nextLine) && !/^\d{2}:\d{2}:\d{2}$/.test(nextLine)) {
+            description += (description ? ' ' : '') + nextLine;
           }
         }
+      }
 
-        if (details) {
-          const amount = paidIn || withdrawn;
-          if (amount > 0) {
-            transactions.push({
-              transactionDate: new Date(dateTimeStr),
-              description: details.trim(),
-              amount,
-              phoneNumber: details.match(/2547\d{7}|0\d{9}/)?.[0] || undefined,
-              receiptNo: receiptBuffer || undefined,
-              paybill: details.match(/\d{5,7}/)?.[0] || undefined,
-            });
-          }
-        }
-        receiptBuffer = '';
+      if (description && amount > 0) {
+        transactions.push({
+          transactionDate: new Date(dateTimeStr),
+          description: description.trim(),
+          amount,
+          phoneNumber: description.match(/2547\d{7}|0\d{9}/)?.[0] || undefined,
+          receiptNo: receiptNo || undefined,
+          paybill: description.match(/\d{5,7}/)?.[0] || undefined,
+        });
       }
     }
 
