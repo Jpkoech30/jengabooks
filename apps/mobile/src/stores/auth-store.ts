@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
 
-const TOKEN_KEY = 'jengabooks_token';
+const TOKEN_KEY = 'jengabooks_auth';
 
 export interface User {
   id: string;
@@ -12,24 +12,33 @@ export interface User {
   role: string;
 }
 
+interface StoredAuth {
+  token: string;
+  refreshToken: string;
+  user: User;
+}
+
 interface AuthState {
   user: User | null;
   token: string | null;
+  refreshToken: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
 
   login: (email: string, password: string) => Promise<void>;
-  logout: () => void;
+  refreshAuth: () => Promise<boolean>;
+  logout: () => Promise<void>;
   setUser: (user: User) => void;
   setLoading: (loading: boolean) => void;
   clearError: () => void;
   hydrate: () => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>((set) => ({
+export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   token: null,
+  refreshToken: null,
   isAuthenticated: false,
   isLoading: true,
   error: null,
@@ -38,10 +47,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const stored = await SecureStore.getItemAsync(TOKEN_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored);
+        const parsed: StoredAuth = JSON.parse(stored);
         set({
           user: parsed.user,
           token: parsed.token,
+          refreshToken: parsed.refreshToken,
           isAuthenticated: true,
           isLoading: false,
         });
@@ -49,8 +59,51 @@ export const useAuthStore = create<AuthState>((set) => ({
         set({ isLoading: false });
       }
     } catch {
-      // SecureStore may fail on web; fall back gracefully
       set({ isLoading: false });
+    }
+  },
+
+  refreshAuth: async (): Promise<boolean> => {
+    const { refreshToken: currentRefreshToken } = get();
+    if (!currentRefreshToken) {
+      get().logout();
+      return false;
+    }
+
+    try {
+      const response = await fetch(
+        `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/refresh`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: currentRefreshToken }),
+        },
+      );
+
+      if (!response.ok) {
+        get().logout();
+        return false;
+      }
+
+      const data = await response.json();
+
+      // Update stored auth
+      const stored: StoredAuth = {
+        token: data.access_token,
+        refreshToken: data.refresh_token || currentRefreshToken,
+        user: get().user || data.user,
+      };
+      await SecureStore.setItemAsync(TOKEN_KEY, JSON.stringify(stored));
+
+      set({
+        token: data.access_token,
+        refreshToken: data.refresh_token || currentRefreshToken,
+      });
+
+      return true;
+    } catch {
+      get().logout();
+      return false;
     }
   },
 
@@ -58,7 +111,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: true, error: null });
     try {
       const response = await fetch(
-        `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api'}/auth/login`,
+        `${process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/login`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -81,15 +134,18 @@ export const useAuthStore = create<AuthState>((set) => ({
         companyName: data.user.companyName,
       };
 
-      // Persist token and user to secure storage
-      await SecureStore.setItemAsync(
-        TOKEN_KEY,
-        JSON.stringify({ token: data.access_token, user }),
-      );
+      // Persist token + refresh token to secure storage
+      const stored: StoredAuth = {
+        token: data.access_token,
+        refreshToken: data.refresh_token,
+        user,
+      };
+      await SecureStore.setItemAsync(TOKEN_KEY, JSON.stringify(stored));
 
       set({
         user,
         token: data.access_token,
+        refreshToken: data.refresh_token,
         isAuthenticated: true,
         isLoading: false,
         error: null,
@@ -111,6 +167,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({
       user: null,
       token: null,
+      refreshToken: null,
       isAuthenticated: false,
       isLoading: false,
       error: null,
