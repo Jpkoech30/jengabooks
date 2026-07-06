@@ -92,11 +92,15 @@ export function Workflow() {
         });
       } catch {
         // Fallback
+        const fallbackPhases = PHASE_ORDER.map(id => ({
+          id, label: id, icon: '📋', status: 'pending' as const,
+          details: '',
+          actionUrl: undefined as string | undefined,
+        }));
         setData({
           overallProgress: 0,
-          phases: PHASE_ORDER.map(id => ({
-            id, label: id, icon: '📋', status: 'pending' as const,
-          })),
+          phases: fallbackPhases,
+          currentPhase: fallbackPhases[0]?.id,
         });
       } finally {
         setLoading(false);

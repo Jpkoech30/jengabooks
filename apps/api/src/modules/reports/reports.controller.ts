@@ -40,4 +40,18 @@ export class ReportsController {
   ) {
     return this.reportsService.getCashFlow(req.user.companyId, from, to);
   }
+
+  @Get('audit-trail')
+  getAuditTrail(
+    @Req() req: any,
+    @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
+    @Query('entityType') entityType?: string,
+  ) {
+    return this.reportsService.getAuditTrail(req.user.companyId, {
+      limit: limit ? parseInt(limit, 10) : undefined,
+      offset: offset ? parseInt(offset, 10) : undefined,
+      entityType,
+    });
+  }
 }

@@ -28,7 +28,7 @@ export class HealthScoreService {
         // Cache is less than 1 hour old
         return {
           overallScore: recent.overallScore,
-          pillars: JSON.parse(recent.pillarScores),
+          pillars: JSON.parse(recent.pillarScores as string),
           calculatedAt: recent.calculatedAt,
           cached: true,
         };

@@ -60,7 +60,7 @@ const categories: ReportCategory[] = [
     icon: '🔍',
     description: 'Audit trail and compliance monitoring reports',
     reports: [
-      { id: '8', name: 'Audit Trail', description: 'Complete change history for all entries', icon: '🔍' },
+      { id: '8', name: 'Audit Trail', description: 'Complete change history for all entries', icon: '🔍', endpoint: '/reports/audit-trail' },
     ],
   },
 ];

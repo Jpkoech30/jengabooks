@@ -32,6 +32,7 @@ model Company {
   aiFeedbackLogs  AiFeedbackLog[]
   userLevels      UserLevel[]
   wizardProgress  WizardProgress[]
+  auditLogs       AuditLog[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("companies")
@@ -63,6 +64,7 @@ model User {
   userLevels     UserLevel[]
   assignedReviews PendingReview[] @relation("AssignedReviews")
   resolvedReviews PendingReview[] @relation("ResolvedReviews")
+  auditLogs       AuditLog[]
   @@map("users")
 }
 

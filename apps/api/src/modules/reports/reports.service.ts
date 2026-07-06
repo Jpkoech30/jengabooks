@@ -1,9 +1,11 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class ReportsService {
+  private readonly logger = new Logger(ReportsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
@@ -242,6 +244,33 @@ export class ReportsService {
         net: netFinancing,
       },
       netCashChange,
+      generatedAt: new Date().toISOString(),
+    };
+  }
+
+  async getAuditTrail(companyId: string, options?: { limit?: number; offset?: number; entityType?: string }) {
+    const take = options?.limit || 50;
+    const skip = options?.offset || 0;
+
+    const where: any = { companyId };
+    if (options?.entityType) where.entityType = options.entityType;
+
+    const [items, total] = await Promise.all([
+      this.prisma.auditLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take,
+        skip,
+        include: { user: { select: { id: true, name: true, email: true } } },
+      }),
+      this.prisma.auditLog.count({ where }),
+    ]);
+
+    return {
+      items,
+      total,
+      limit: take,
+      offset: skip,
       generatedAt: new Date().toISOString(),
     };
   }

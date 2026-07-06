@@ -82,7 +82,7 @@ export function PortfolioHeatmap() {
             <thead>
               <tr>
                 <th className="text-left text-xs font-medium text-gray-500 pb-2 pr-4">Tenant</th>
-                {mockData[0].periods.map((p) => (
+                {mockData[0]!.periods.map((p) => (
                   <th key={p.label} className="text-center text-xs font-medium text-gray-500 pb-2 px-1 w-12">
                     {p.label}
                   </th>

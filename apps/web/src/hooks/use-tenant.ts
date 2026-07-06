@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { useUiStore } from '../stores/ui-store';
 
 interface Tenant {
@@ -13,12 +13,12 @@ interface Tenant {
  * Manages the active tenant selection and persists it.
  */
 export function useTenant() {
-  const { activeTenantId, setActiveTenantId, setLastSyncedAt } = useUiStore();
+  const [activeTenantId, setActiveTenantId] = React.useState<string | null>(null);
 
   useEffect(() => {
     // Restore tenant preference from storage
     const savedTenantId = localStorage.getItem('jengabooks_tenant_id');
-    if (savedTenantId && !activeTenantId) {
+    if (savedTenantId) {
       setActiveTenantId(savedTenantId);
     }
   }, []);
@@ -26,8 +26,6 @@ export function useTenant() {
   const switchTenant = (tenantId: string) => {
     setActiveTenantId(tenantId);
     localStorage.setItem('jengabooks_tenant_id', tenantId);
-    // Reset sync timestamp on tenant switch
-    setLastSyncedAt(new Date());
   };
 
   const getTenantFromStorage = (): Tenant | null => {

@@ -34,13 +34,13 @@ export function AiActivityFeed() {
     const interval = setInterval(() => {
       const newActivity: Activity = {
         id: Date.now().toString(),
-        agent: ['Reconciliation', 'Fraud Detection', 'Compliance', 'Advisory'][Math.floor(Math.random() * 4)],
-        action: [
+        agent: (['Reconciliation', 'Fraud Detection', 'Compliance', 'Advisory'] as const)[Math.floor(Math.random() * 4)] ?? 'Reconciliation',
+        action: ([
           'Processing batch reconciliation...',
           'Analyzing transaction patterns...',
           'Validating eTIMS compliance...',
           'Generating financial insights...',
-        ][Math.floor(Math.random() * 4)],
+        ] as const)[Math.floor(Math.random() * 4)] ?? 'Processing...',
         status: ['pending', 'success', 'error'][Math.floor(Math.random() * 3)] as Activity['status'],
         timestamp: new Date(),
       };
