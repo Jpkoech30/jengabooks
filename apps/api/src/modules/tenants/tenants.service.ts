@@ -5,10 +5,18 @@ import { PrismaService } from '../../prisma/prisma.service';
 export class TenantsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async findAll(page = 1, limit = 20) {
+  async findAll(userId: string, role: string, page = 1, limit = 20) {
     const skip = (page - 1) * limit;
+
+    // SUPER_ADMIN can see all companies; other users see only their own companies
+    const where: any = {};
+    if (role !== 'SUPER_ADMIN') {
+      where.members = { some: { userId, isActive: true } };
+    }
+
     const [companies, total] = await Promise.all([
       this.prisma.company.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
@@ -27,7 +35,7 @@ export class TenantsService {
           },
         },
       }),
-      this.prisma.company.count(),
+      this.prisma.company.count({ where }),
     ]);
 
     return {

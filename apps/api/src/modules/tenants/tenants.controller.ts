@@ -9,10 +9,15 @@ export class TenantsController {
 
   @Get()
   findAll(
+    @Req() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    // Enforce tenant isolation: users can only see companies they belong to
+    // SUPER_ADMIN can see all companies
     return this.tenantsService.findAll(
+      req.user.userId,
+      req.user.role,
       page ? parseInt(page, 10) : 1,
       limit ? Math.min(parseInt(limit, 10), 100) : 20,
     );

@@ -49,20 +49,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       if (!response.ok) throw new Error('Token invalid');
       const profile = await response.json();
-      const activeCompanyId = localStorage.getItem('jengabooks_company_id') || profile.memberships?.[0]?.companyId;
-      const activeMembership = profile.memberships?.find((m: any) => m.companyId === activeCompanyId) || profile.memberships?.[0];
+      const activeMembership = profile.memberships?.[0];
 
-      // Clear any stale localStorage tokens to prevent Authorization header
-      // from overriding the valid httpOnly cookie (which causes 401 loops)
-      localStorage.removeItem('jengabooks_token');
-      localStorage.removeItem('jengabooks_refresh_token');
+      // IMPORTANT: We rely solely on the httpOnly cookie for authentication.
+      // No tokens are stored in localStorage to prevent XSS token theft.
+      localStorage.removeItem('jengabooks_company_id');
 
       set({
         user: {
           id: profile.id,
           email: profile.email,
           name: profile.name,
-          companyId: activeMembership?.companyId || activeCompanyId,
+          companyId: activeMembership?.companyId || '',
           companyName: activeMembership?.companyName || '',
           role: activeMembership?.role || '',
           memberships: profile.memberships || [],
@@ -70,20 +68,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
         token: null, // No Bearer token - rely on the httpOnly cookie
+        refreshToken: null,
       });
     } catch {
+      // Clear any stale localStorage items
       localStorage.removeItem('jengabooks_company_id');
-      localStorage.removeItem('jengabooks_token');
-      localStorage.removeItem('jengabooks_refresh_token');
-      set({ isAuthenticated: false, isLoading: false, token: null, user: null });
+      set({ isAuthenticated: false, isLoading: false, token: null, refreshToken: null, user: null });
     }
   },
 
   login: async (email: string, password: string) => {
     set({ isLoading: true, error: null });
-    // Clear any stale tokens before logging in to prevent 401 loops
-    localStorage.removeItem('jengabooks_token');
-    localStorage.removeItem('jengabooks_refresh_token');
     try {
       const response = await fetch('/api/auth/login', {
         method: 'POST',
@@ -101,8 +96,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       // Fetch full profile to get memberships
       const profileRes = await fetch('/api/auth/profile', {
-        headers: { Authorization: `Bearer ${data.access_token}` },
-        credentials: 'include',
+        credentials: 'include', // httpOnly cookie is auto-sent
       });
       const profile = profileRes.ok ? await profileRes.json() : { memberships: [] };
 
@@ -118,17 +112,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
       set({
         user,
-        token: data.access_token,
-        refreshToken: data.refresh_token,
+        token: null, // Not stored — httpOnly cookie is the sole auth mechanism
+        refreshToken: null,
         isAuthenticated: true,
         isLoading: false,
         error: null,
       });
 
-      // Store token and refresh token in localStorage as fallback (primary auth is httpOnly cookie)
-      localStorage.setItem('jengabooks_token', data.access_token);
-      localStorage.setItem('jengabooks_refresh_token', data.refresh_token);
-      localStorage.setItem('jengabooks_company_id', user.companyId);
+      // IMPORTANT: No tokens stored in localStorage to prevent XSS token theft.
+      // Authentication relies solely on the httpOnly cookie set by the server.
     } catch (err) {
       set({
         isLoading: false,
@@ -138,18 +130,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   switchCompany: async (companyId: string): Promise<boolean> => {
-    const { token, refreshToken } = get();
-    if (!token) return false;
     set({ isLoading: true });
     try {
       const response = await fetch('/api/auth/switch-company', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ companyId }),
-        credentials: 'include',
+        credentials: 'include', // httpOnly cookie is auto-sent
       });
       if (!response.ok) throw new Error('Failed to switch company');
       const data = await response.json();
@@ -161,12 +150,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           companyName: data.user.companyName,
           role: data.user.role,
         },
-        token: data.access_token,
+        token: null,
         isLoading: false,
       });
-      localStorage.setItem('jengabooks_token', data.access_token);
-      localStorage.setItem('jengabooks_refresh_token', data.refresh_token || refreshToken || '');
-      localStorage.setItem('jengabooks_company_id', data.user.companyId);
       return true;
     } catch (err) {
       set({
@@ -187,9 +173,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch {
       // Server might be unreachable, still logout locally
     }
-    localStorage.removeItem('jengabooks_token');
-    localStorage.removeItem('jengabooks_refresh_token');
-    localStorage.removeItem('jengabooks_company_id');
     set({
       user: null,
       token: null,

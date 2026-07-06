@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
@@ -23,6 +25,12 @@ import { WizardModule } from './modules/wizard/wizard.module';
       // - './apps/api/.env' works when running from the monorepo root (turbo dev)
       envFilePath: ['.env', './apps/api/.env'],
     }),
+    // Global rate limiting: 120 requests per 60 seconds by default
+    // Auth endpoints use stricter limits via @Throttle() decorators
+    ThrottlerModule.forRoot([{
+      ttl: 60000,
+      limit: 120,
+    }]),
     PrismaModule,
     AuthModule,
     TenantsModule,
@@ -36,6 +44,12 @@ import { WizardModule } from './modules/wizard/wizard.module';
     GamificationModule,
     HealthScoreModule,
     WizardModule,
+  ],
+  providers: [
+    {
+      provide: APP_GUARD,
+      useClass: ThrottlerGuard,
+    },
   ],
 })
 export class AppModule {}

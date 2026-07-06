@@ -215,7 +215,7 @@ export class HitlService {
               reference: data.reference,
               entryDate: new Date(data.entryDate),
               postedById: data.postedById,
-              serialNumber: `HITL-${Date.now()}`,
+              serialNumber: `HITL-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
             },
           });
         }

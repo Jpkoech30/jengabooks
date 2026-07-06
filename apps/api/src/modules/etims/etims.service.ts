@@ -118,7 +118,8 @@ export class EtimsService {
     const submission = await this.circuitBreaker.call(async () => {
       // Placeholder: In production, this would POST to KRA eTIMS API
       // const response = await axios.post(KRA_ETIMS_URL, xmlPayload, { headers });
-      const mockResponse = { status: 'PENDING', serialNumber: `ETIMS-${Date.now()}` };
+      const serialCount = await this.prisma.eTIMSSubmission.count();
+      const mockResponse = { status: 'PENDING', serialNumber: `ETIMS-${invoice.invoiceNumber}-${String(serialCount + 1).padStart(5, '0')}` };
 
       return this.prisma.eTIMSSubmission.upsert({
         where: { invoiceId },

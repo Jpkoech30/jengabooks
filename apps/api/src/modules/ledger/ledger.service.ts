@@ -204,8 +204,8 @@ export class LedgerService {
       );
     }
 
-    // Generate serial number if not provided
-    const serialNumber = data.serialNumber || `JE-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    // Generate sequential serial number for audit trail
+    const serialNumber = data.serialNumber || await this.generateSerialNumber(companyId, 'JE');
 
     const entry = await this.prisma.journalEntry.create({
       data: {
@@ -340,7 +340,7 @@ export class LedgerService {
 
     // Create two journal entries (double-entry)
     const entryDate = new Date(data.entryDate);
-    const serialNumber = `INC-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const serialNumber = await this.generateSerialNumber(companyId, 'INC');
 
     // Debit cash account
     await this.prisma.journalEntry.create({
@@ -414,7 +414,7 @@ export class LedgerService {
     }
 
     const entryDate = new Date(data.entryDate);
-    const serialNumber = `EXP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const serialNumber = await this.generateSerialNumber(companyId, 'EXP');
 
     // Debit expense account
     await this.prisma.journalEntry.create({
@@ -458,5 +458,27 @@ export class LedgerService {
     ).catch(() => {});
 
     return entry;
+  }
+
+  /**
+   * Generate a sequential serial number per company for audit trail compliance.
+   * Format: {PREFIX}-{YYYYMMDD}-{SEQUENTIAL_5_DIGITS}
+   * Example: JE-20260706-00001, INC-20260706-00042
+   */
+  private async generateSerialNumber(companyId: string, prefix: string): Promise<string> {
+    const today = new Date();
+    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    // Count existing entries with today's prefix to get the sequence number
+    const count = await this.prisma.journalEntry.count({
+      where: {
+        companyId,
+        serialNumber: {
+          startsWith: `${prefix}-${dateStr}`,
+        },
+      },
+    });
+    
+    return `${prefix}-${dateStr}-${String(count + 1).padStart(5, '0')}`;
   }
 }

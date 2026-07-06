@@ -1,4 +1,5 @@
 import { Controller, Post, Get, Body, UseGuards, Req, UnauthorizedException, Res, HttpCode } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -18,6 +19,7 @@ export class AuthController {
   ) {}
 
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 attempts per minute
   async login(@Body() body: LoginDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.login(body.email, body.password);
     
@@ -34,6 +36,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 registration attempts per minute
   async register(@Body() body: RegisterDto, @Res({ passthrough: true }) res: Response) {
     const result = await this.authService.register(body);
     

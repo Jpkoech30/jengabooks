@@ -1,4 +1,4 @@
-import axios, { AxiosError, InternalAxiosRequestConfig } from 'axios';
+import axios, { AxiosError } from 'axios';
 
 const API_BASE_URL = '/api';
 
@@ -8,22 +8,12 @@ export const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // Send httpOnly cookies automatically
+  withCredentials: true, // httpOnly cookies are auto-sent by the browser
 });
 
-// Request interceptor - attach JWT token as fallback (cookie is primary)
-apiClient.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    const token = localStorage.getItem('jengabooks_token');
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error: AxiosError) => {
-    return Promise.reject(error);
-  },
-);
+// IMPORTANT: No request interceptor for JWT tokens.
+// Authentication is handled entirely via httpOnly cookies set by the server.
+// This prevents XSS attacks from stealing tokens stored in localStorage.
 
 // Response interceptor - handle common errors with toast notifications
 apiClient.interceptors.response.use(
@@ -35,30 +25,9 @@ apiClient.interceptors.response.use(
 
       switch (status) {
         case 401:
-          // Token expired or invalid - try refresh using stored refresh token
-          const storedRefreshToken = localStorage.getItem('jengabooks_refresh_token');
-          if (!storedRefreshToken) {
-            // Dispatch event so React Router handles the redirect (no full page reload)
-            window.dispatchEvent(new CustomEvent('auth:logout'));
-            break;
-          }
-          try {
-            const refreshRes = await axios.post('/api/auth/refresh', { refreshToken: storedRefreshToken }, { withCredentials: true });
-            if (refreshRes.data?.access_token) {
-              localStorage.setItem('jengabooks_token', refreshRes.data.access_token);
-              if (refreshRes.data?.refresh_token) {
-                localStorage.setItem('jengabooks_refresh_token', refreshRes.data.refresh_token);
-              }
-              // Retry original request
-              if (error.config) {
-                error.config.headers.Authorization = `Bearer ${refreshRes.data.access_token}`;
-                return apiClient(error.config);
-              }
-            }
-          } catch {
-            // Refresh failed, dispatch logout event (no full page reload)
-            window.dispatchEvent(new CustomEvent('auth:logout'));
-          }
+          // Token expired or invalid — dispatch logout event
+          // The httpOnly cookie will be cleared server-side
+          window.dispatchEvent(new CustomEvent('auth:logout'));
           break;
         case 403:
           if (typeof window !== 'undefined') {

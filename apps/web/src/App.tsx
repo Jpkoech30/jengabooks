@@ -93,7 +93,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        {/* Proper 404 for unknown routes instead of silently redirecting to login */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
     );
   }
