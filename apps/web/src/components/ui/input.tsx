@@ -13,19 +13,21 @@ export function Input({ label, error, helperText, className, id, ...props }: Inp
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">
+        <label htmlFor={inputId} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
           {label}
         </label>
       )}
       <input
         id={inputId}
         className={clsx(
-          'touch-target h-12 rounded-lg border px-4 text-base transition-colors',
-          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-kenya-green-500',
-          'placeholder:text-gray-400 dark:placeholder:text-gray-500',
+          'w-full px-4 py-3 rounded-lg border bg-white text-gray-900 placeholder-gray-400',
+          'focus:outline-none focus:ring-2 transition-all duration-200',
+          'dark:bg-surface-dark dark:text-gray-100 dark:placeholder-gray-500',
+          'disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60',
+          'min-h-[48px] text-base',
           {
-            'border-kenya-green-200 bg-white dark:border-kenya-green-700 dark:bg-kenya-surface-dark': !error,
-            'border-kenya-red bg-red-50 dark:bg-red-900/20': error,
+            'border-gray-300 focus:border-kenya-green-500 focus:ring-kenya-green-500 dark:border-gray-700 dark:focus:ring-kenya-green-400': !error,
+            'border-kenya-red-500 focus:border-kenya-red-500 focus:ring-kenya-red-500 dark:border-red-400': error,
           },
           className,
         )}
@@ -34,12 +36,12 @@ export function Input({ label, error, helperText, className, id, ...props }: Inp
         {...props}
       />
       {error && (
-        <p id={`${inputId}-error`} className="text-sm text-kenya-red" role="alert">
+        <p id={`${inputId}-error`} className="mt-1.5 text-sm text-kenya-red-500 dark:text-kenya-red-400" role="alert">
           {error}
         </p>
       )}
       {helperText && !error && (
-        <p id={`${inputId}-helper`} className="text-sm text-gray-500 dark:text-gray-400">
+        <p id={`${inputId}-helper`} className="mt-1.5 text-sm text-gray-500 dark:text-gray-400">
           {helperText}
         </p>
       )}

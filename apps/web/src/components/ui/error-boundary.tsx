@@ -45,7 +45,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
             {this.state.error?.message || 'An unexpected error occurred. Please try again.'}
           </p>
           <div className="flex gap-3">
-            <Button variant="default" onClick={this.handleRetry}>
+            <Button variant="primary" onClick={this.handleRetry}>
               Try Again
             </Button>
             <Button

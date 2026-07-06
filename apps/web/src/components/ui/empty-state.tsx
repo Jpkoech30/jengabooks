@@ -20,7 +20,7 @@ export function EmptyState({ icon = '📋', title, description, action }: EmptyS
         </p>
       )}
       {action && (
-        <Button variant="default" size="md" onClick={action.onClick}>
+        <Button variant="primary" size="md" onClick={action.onClick}>
           {action.label}
         </Button>
       )}
