@@ -13,6 +13,28 @@ import { useJournalEntries } from '../hooks/use-api';
 import { api } from '../lib/api-client';
 import { formatKES, formatDate } from '../lib/utils';
 
+function renderConfidenceBadge(confidence: number | null | undefined) {
+  if (confidence == null) return <span className="text-xs text-gray-400">—</span>;
+
+  const tier = confidence >= 0.9 ? 'high' : confidence >= 0.7 ? 'medium' : 'low';
+  const colors = {
+    high: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+    low: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  };
+  const labels = {
+    high: '✓ High',
+    medium: '~ Med',
+    low: '! Low',
+  };
+
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${colors[tier]}`}>
+      {labels[tier]}
+    </span>
+  );
+}
+
 export function Ledger() {
   const [search, setSearch] = React.useState('');
   const [page, setPage] = React.useState(1);
@@ -168,6 +190,7 @@ export function Ledger() {
                       <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
                       <th className="text-left py-3 px-3 font-medium text-gray-500">Description</th>
                       <th className="text-left py-3 px-3 font-medium text-gray-500">Account</th>
+                      <th className="text-center py-3 px-3 font-medium text-gray-500">Confidence</th>
                       <th className="text-right py-3 px-3 font-medium text-gray-500">Debit</th>
                       <th className="text-right py-3 px-3 font-medium text-gray-500">Credit</th>
                       <th className="text-left py-3 px-3 font-medium text-gray-500">Posted By</th>
@@ -183,6 +206,9 @@ export function Ledger() {
                         <td className="py-3 px-3 text-kenya-green-900 dark:text-kenya-green-50 font-medium">{entry.description}</td>
                         <td className="py-3 px-3">
                           <Badge variant="neutral" size="sm">{entry.account?.code} {entry.account?.name}</Badge>
+                        </td>
+                        <td className="py-3 px-3 text-center">
+                          {renderConfidenceBadge(entry.aiConfidence)}
                         </td>
                         <td className="py-3 px-3 text-right font-mono text-sm text-kenya-green-700 dark:text-kenya-green-300">
                           {entry.direction === 'DEBIT' ? formatKES(entry.amount) : '-'}

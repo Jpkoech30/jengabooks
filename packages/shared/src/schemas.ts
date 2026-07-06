@@ -147,3 +147,31 @@ export type MpesaUploadInput = z.infer<typeof mpesaUploadSchema>;
 export type ResolveReviewInput = z.infer<typeof resolveReviewSchema>;
 export type ReportQueryInput = z.infer<typeof reportQuerySchema>;
 export type WizardStepInput = z.infer<typeof wizardStepSchema>;
+
+// ─── Confidence Level Helpers ───────────────────────────────────────
+
+export type ConfidenceTier = 'high' | 'medium' | 'low';
+
+/**
+ * Get the confidence tier for a given score.
+ * - >= 0.9: high (Green) — auto-posted
+ * - 0.7 to 0.9: medium (Yellow) — flagged for review
+ * - < 0.7: low (Red) — sent to HITL
+ */
+export function getConfidenceTier(confidence: number | null | undefined): ConfidenceTier {
+  if (confidence == null) return 'low';
+  if (confidence >= 0.9) return 'high';
+  if (confidence >= 0.7) return 'medium';
+  return 'low';
+}
+
+/**
+ * Get the color associated with a confidence tier.
+ */
+export function getConfidenceColor(tier: ConfidenceTier): string {
+  switch (tier) {
+    case 'high': return 'green';
+    case 'medium': return 'amber';
+    case 'low': return 'red';
+  }
+}
