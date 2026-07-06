@@ -11,7 +11,7 @@ const config: Config = {
   coverageDirectory: '../coverage',
   testEnvironment: 'node',
   moduleNameMapper: {
-    '^@jengabooks/shared$': '<rootDir>/../../packages/shared/src',
+    '^@jengabooks/shared$': '<rootDir>/../../../packages/shared/src',
   },
 };
 

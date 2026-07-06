@@ -3,6 +3,19 @@ import { PrismaService } from '../../prisma/prisma.service';
 // Import shared constants to ensure consistency across the codebase
 import { LEVEL_THRESHOLDS } from '@jengabooks/shared';
 
+// Badge definitions (defined here — shared package doesn't export this format yet)
+const BADGE_DEFINITIONS = [
+  { id: 'ACCOUNTANT', name: 'Accountant', description: 'Set up your Chart of Accounts', icon: '📚' },
+  { id: 'MPESA_CONNECTED', name: 'M-Pesa Connected', description: 'Connect M-Pesa business number', icon: '📱' },
+  { id: 'DATA_DRIVEN', name: 'Data Driven', description: 'Import first M-Pesa CSV', icon: '📊' },
+  { id: 'FIRST_INCOME', name: 'First Income', description: 'Record your first income', icon: '💰' },
+  { id: 'FIRST_EXPENSE', name: 'First Expense', description: 'Record your first expense', icon: '💳' },
+  { id: 'INVOICER', name: 'Invoicer', description: 'Create your first invoice', icon: '📄' },
+  { id: 'TAX_COMPLIANT', name: 'Tax Compliant', description: 'Submit first eTIMS invoice', icon: '🛡️' },
+  { id: 'TEAM_PLAYER', name: 'Team Player', description: 'Invite a team member', icon: '👥' },
+  { id: 'ANALYST', name: 'Analyst', description: 'Generate your first report', icon: '📈' },
+];
+
 @Injectable()
 export class GamificationService {
   private readonly logger = new Logger(GamificationService.name);
