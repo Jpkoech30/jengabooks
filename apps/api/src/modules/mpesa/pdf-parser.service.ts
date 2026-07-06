@@ -1,5 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-const pdfParse = require('pdf-parse');
 
 interface ExtractedTransaction {
   transactionDate: Date;
@@ -8,6 +7,16 @@ interface ExtractedTransaction {
   phoneNumber?: string;
   receiptNo?: string;
   paybill?: string;
+}
+
+// pdf-parse v2 is ESM-only; lazy-init with dynamic import for CommonJS compat
+let _pdfParse: any = null;
+async function loadPdfParse(): Promise<any> {
+  if (!_pdfParse) {
+    const mod = await import('pdf-parse');
+    _pdfParse = mod.default || mod;
+  }
+  return _pdfParse;
 }
 
 @Injectable()
@@ -19,10 +28,10 @@ export class PdfParserService {
     rawText: string;
     bankType: 'mpesa' | 'bank' | 'unknown';
   }> {
+    const pdfParse = await loadPdfParse();
     const data = await pdfParse(buffer);
     const text = data.text;
 
-    // Detect bank type from header text
     const bankType = this.detectBankType(text);
     this.logger.log(`Detected bank type: ${bankType}, PDF pages: ${data.numpages}`);
 
@@ -58,21 +67,11 @@ export class PdfParserService {
     const transactions: ExtractedTransaction[] = [];
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // M-Pesa statement patterns:
-    // "Paid to JOHN DOE on 15/01/2026 at 14:30 KES 1,500.00"
-    // "Received from 0712345678 on 15/01/2026 at 14:30 KES 500.00"
-    // "Sent to 0712345678 on 15/01/2026 KES 1,000.00"
-    // "Transaction Cost,KES 0.00"
-    // "Receipt No: ABC123DEF"
-
     const mpesaPatterns = [
-      // Paid to / Received from / Sent to patterns
       /(Paid to|Received from|Sent to)\s+(.+?)\s+on\s+(\d{1,2}\/\d{1,2}\/\d{4}).*?KES\s+([\d,]+\.?\d*)/i,
-      // "You have sent KES 1,000.00 to 0712345678 on 15/1/2026"
       /(sent|received|paid)\s+kes\s+([\d,]+\.?\d*)\s+(to|from)\s+(\S+)\s+on\s+(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})/i,
     ];
 
-    // Also look for structured CSV-like data within PDF
     let receiptNo = '';
     for (const line of lines) {
       const receiptMatch = line.match(/Receipt\s*No[:\s]+([A-Z0-9]+)/i);
@@ -108,11 +107,6 @@ export class PdfParserService {
     const transactions: ExtractedTransaction[] = [];
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // Kenyan bank statement format:
-    // Date | Description | Debit | Credit | Balance
-    // 15/01/2026 | M-PESA WITHDRAWAL | 5,000.00 | | 150,000.00
-    // 16/01/2026 | SALARY DEPOSIT | | 100,000.00 | 250,000.00
-
     const linePattern = /^(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})\s+([A-Za-z0-9\s\/\-]+?)\s+([\d,]+\.?\d*)?\s+([\d,]+\.?\d*)?\s+([\d,]+\.?\d*)?$/;
 
     for (const line of lines) {
@@ -145,7 +139,6 @@ export class PdfParserService {
     const transactions: ExtractedTransaction[] = [];
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // Generic fallback: find any line with a date and a number
     const datePattern = /\b(\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4})\b/;
     const amountPattern = /KES\s*([\d,]+\.?\d*)/i;
 
