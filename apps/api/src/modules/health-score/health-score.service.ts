@@ -26,9 +26,20 @@ export class HealthScoreService {
       const elapsed = Date.now() - new Date(recent.calculatedAt).getTime();
       if (elapsed < 3600000) {
         // Cache is less than 1 hour old
+        // Parse pillarScores which may be stored as JSON string or JSON object
+        let pillars: PillarScore[];
+        try {
+          const raw = recent.pillarScores;
+          pillars = typeof raw === 'string' ? JSON.parse(raw) : raw as unknown as PillarScore[];
+        } catch {
+          // Corrupted cache data — fall through to recalculate
+          pillars = await this.calculatePillars(companyId);
+          const overallScore = this.calculateOverall(pillars);
+          return { overallScore, pillars, calculatedAt: new Date().toISOString(), cached: false };
+        }
         return {
           overallScore: recent.overallScore,
-          pillars: JSON.parse(recent.pillarScores as string),
+          pillars,
           calculatedAt: recent.calculatedAt,
           cached: true,
         };
