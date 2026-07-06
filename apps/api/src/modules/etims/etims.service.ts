@@ -1,15 +1,27 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class EtimsService {
+  private readonly logger = new Logger(EtimsService.name);
+  private readonly kraApiUrl: string | undefined;
+  private readonly kraClientId: string | undefined;
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly gamificationService: GamificationService,
-  ) {}
+  ) {
+    this.kraApiUrl = process.env.KRA_API_URL;
+    this.kraClientId = process.env.KRA_CLIENT_ID;
+    if (this.kraApiUrl) {
+      this.logger.log(`eTIMS configured with KRA API: ${this.kraApiUrl}`);
+    } else {
+      this.logger.warn('KRA_API_URL not set — eTIMS submissions will use mock responses');
+    }
+  }
 
   // ─── Invoices ──────────────────────────────────────────────────────────
 
@@ -114,29 +126,64 @@ export class EtimsService {
     // Build KRA XML payload (simplified placeholder)
     const xmlPayload = this.buildXmlPayload(invoice);
 
-    // Submit via circuit breaker (placeholder — actual KRA API call)
+    // Submit via circuit breaker
     const submission = await this.circuitBreaker.call(async () => {
-      // Placeholder: In production, this would POST to KRA eTIMS API
-      // const response = await axios.post(KRA_ETIMS_URL, xmlPayload, { headers });
-      const serialCount = await this.prisma.eTIMSSubmission.count();
-      const mockResponse = { status: 'PENDING', serialNumber: `ETIMS-${invoice.invoiceNumber}-${String(serialCount + 1).padStart(5, '0')}` };
+      let kraResponse: { status: string; serialNumber: string; [key: string]: unknown };
+      let submissionStatus: string;
+      let serialNumber: string;
+
+      if (this.kraApiUrl) {
+        // ─── Real KRA eTIMS API Call ────────────────────────────────────
+        try {
+          const axios = require('axios');
+          const response = await axios.post(
+            `${this.kraApiUrl}/submissions`,
+            xmlPayload,
+            {
+              headers: {
+                'Content-Type': 'application/xml',
+                'X-Client-ID': this.kraClientId || '',
+                'X-API-Version': '1.0',
+              },
+              timeout: 15000,
+            },
+          );
+          kraResponse = response.data;
+          submissionStatus = response.data.status || 'PENDING';
+          serialNumber = response.data.serialNumber || `KRA-${Date.now()}`;
+          this.logger.log(`eTIMS submission successful: ${serialNumber}`);
+        } catch (apiError: any) {
+          this.logger.error(`KRA API error: ${apiError.message}`, apiError.stack);
+          // Fall through to create a failed submission record for retry
+          kraResponse = { status: 'FAILED', error: apiError.message, serialNumber: '' };
+          submissionStatus = 'FAILED';
+          serialNumber = `FAILED-${Date.now()}`;
+        }
+      } else {
+        // ─── Placeholder Mock (Development) ─────────────────────────────
+        const serialCount = await this.prisma.eTIMSSubmission.count();
+        kraResponse = { status: 'PENDING', serialNumber: `ETIMS-${invoice.invoiceNumber}-${String(serialCount + 1).padStart(5, '0')}` };
+        submissionStatus = kraResponse.status;
+        serialNumber = kraResponse.serialNumber;
+      }
 
       return this.prisma.eTIMSSubmission.upsert({
         where: { invoiceId },
         update: {
           xmlPayload,
-          kraResponse: JSON.stringify(mockResponse),
-          status: mockResponse.status,
-          serialNumber: mockResponse.serialNumber,
+          kraResponse: JSON.stringify(kraResponse),
+          status: submissionStatus,
+          serialNumber,
           submittedAt: new Date(),
           retryCount: { increment: existing?.retryCount || 0 },
+          lastError: submissionStatus === 'FAILED' ? JSON.stringify(kraResponse) : null,
         },
         create: {
           invoiceId,
-          serialNumber: mockResponse.serialNumber,
+          serialNumber,
           xmlPayload,
-          kraResponse: JSON.stringify(mockResponse),
-          status: mockResponse.status,
+          kraResponse: JSON.stringify(kraResponse),
+          status: submissionStatus,
           submittedAt: new Date(),
         },
       });

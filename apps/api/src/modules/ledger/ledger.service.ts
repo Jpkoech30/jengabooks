@@ -320,14 +320,37 @@ export class LedgerService {
     // In a quick entry, we credit the selected income account
     // and debit a default cash account
 
-    // Find a default cash account (first asset account)
-    const cashAccount = await this.prisma.chartOfAccount.findFirst({
-      where: { companyId, type: 'ASSET', isActive: true, deletedAt: null },
-      orderBy: { code: 'asc' },
+    // Find a default cash/bank account — match by name or code patterns first
+    let cashAccount = await this.prisma.chartOfAccount.findFirst({
+      where: {
+        companyId,
+        type: 'ASSET',
+        isActive: true,
+        deletedAt: null,
+        OR: [
+          { name: { contains: 'Cash', mode: 'insensitive' } },
+          { name: { contains: 'Bank', mode: 'insensitive' } },
+          { name: { contains: 'M-Pesa', mode: 'insensitive' } },
+          { name: { contains: 'Petty', mode: 'insensitive' } },
+          { code: { startsWith: '100' } }, // Standard cash account codes
+          { code: { startsWith: '110' } }, // Standard bank account codes
+        ],
+      },
+      orderBy: [{ code: 'asc' }],
     });
 
     if (!cashAccount) {
-      throw new BadRequestException('No asset account found. Please create a cash/bank account first.');
+      // Fallback to any asset account
+      const fallbackAccount = await this.prisma.chartOfAccount.findFirst({
+        where: { companyId, type: 'ASSET', isActive: true, deletedAt: null },
+        orderBy: { code: 'asc' },
+      });
+      if (!fallbackAccount) {
+        throw new BadRequestException('No asset account found. Please create a cash/bank account first.');
+      }
+      // Assign the fallback as the cash account
+      // Both branches guarantee cashAccount is non-null at this point
+      cashAccount = fallbackAccount!;
     }
 
     // Validate income account exists and is INCOME type
@@ -346,7 +369,7 @@ export class LedgerService {
     await this.prisma.journalEntry.create({
       data: {
         companyId,
-        accountId: cashAccount.id,
+        accountId: cashAccount!.id,
         description: data.description,
         amount: data.amount,
         direction: 'DEBIT',
@@ -397,13 +420,35 @@ export class LedgerService {
     postedById: string;
   }) {
     // For expense: debit the expense account, credit the cash/bank account
-    const cashAccount = await this.prisma.chartOfAccount.findFirst({
-      where: { companyId, type: 'ASSET', isActive: true, deletedAt: null },
-      orderBy: { code: 'asc' },
+    // Find a default cash/bank account — match by name or code patterns first
+    let cashAccount = await this.prisma.chartOfAccount.findFirst({
+      where: {
+        companyId,
+        type: 'ASSET',
+        isActive: true,
+        deletedAt: null,
+        OR: [
+          { name: { contains: 'Cash', mode: 'insensitive' } },
+          { name: { contains: 'Bank', mode: 'insensitive' } },
+          { name: { contains: 'M-Pesa', mode: 'insensitive' } },
+          { name: { contains: 'Petty', mode: 'insensitive' } },
+          { code: { startsWith: '100' } },
+          { code: { startsWith: '110' } },
+        ],
+      },
+      orderBy: [{ code: 'asc' }],
     });
 
     if (!cashAccount) {
-      throw new BadRequestException('No asset account found. Please create a cash/bank account first.');
+      // Fallback to any asset account
+      const fallbackAccount = await this.prisma.chartOfAccount.findFirst({
+        where: { companyId, type: 'ASSET', isActive: true, deletedAt: null },
+        orderBy: { code: 'asc' },
+      });
+      if (!fallbackAccount) {
+        throw new BadRequestException('No asset account found. Please create a cash/bank account first.');
+      }
+      cashAccount = fallbackAccount;
     }
 
     const expenseAccount = await this.prisma.chartOfAccount.findFirst({
@@ -435,7 +480,7 @@ export class LedgerService {
     const entry = await this.prisma.journalEntry.create({
       data: {
         companyId,
-        accountId: cashAccount.id,
+        accountId: cashAccount!.id,
         description: data.description,
         amount: data.amount,
         direction: 'CREDIT',
