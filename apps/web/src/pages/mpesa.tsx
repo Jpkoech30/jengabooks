@@ -90,7 +90,7 @@ export function MpesaImport() {
 
   const handleDeleteTransaction = async (receiptNo: string) => {
     try {
-      await apiClient.delete(`/api/mpesa/transactions?receiptNo=${receiptNo}`);
+      await apiClient.delete(`/mpesa/transactions?receiptNo=${receiptNo}`);
       showToast('success', 'Deleted', 'Transaction deleted successfully');
       loadTransactions();
     } catch { showToast('error', 'Failed', 'Could not delete transaction'); }
@@ -99,7 +99,7 @@ export function MpesaImport() {
 
   const handleDeleteAll = async () => {
     try {
-      await apiClient.delete('/api/mpesa/transactions/all');
+      await apiClient.delete('/mpesa/transactions/all');
       showToast('success', 'Deleted', 'All transactions deleted successfully');
       loadTransactions();
     } catch { showToast('error', 'Failed', 'Could not delete transactions'); }
