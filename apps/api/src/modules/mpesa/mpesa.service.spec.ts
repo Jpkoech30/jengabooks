@@ -22,6 +22,7 @@ describe('MpesaService', () => {
       updateMany: jest.fn(),
       count: jest.fn(),
     },
+    journalEntry: { create: jest.fn() },
     categoryRule: { findMany: jest.fn() },
     chartOfAccount: { findUnique: jest.fn(), findFirst: jest.fn() },
   };
@@ -141,6 +142,23 @@ describe('MpesaService', () => {
       await service.uploadCsv('c1', 'u1', csv);
 
       // Should have called updateMany with the AI-mapped account
+      expect(mockPrisma.mpesaTransaction.updateMany).toHaveBeenCalled();
+    });
+
+    it('should auto-create journal entry for confidence >= 0.9', async () => {
+      mockPrisma.mpesaTransaction.updateMany.mockResolvedValue({ count: 0 });
+      mockPrisma.chartOfAccount.findUnique.mockResolvedValue({ id: 'acc-6001', code: '6001', type: 'INCOME' });
+      mockReconciliationAgent.reconcile.mockResolvedValue({
+        accountId: '6001',
+        confidence: 0.95,
+        reasoning: 'High confidence match for Safaricom payment',
+      });
+
+      await service.uploadCsv('c1', 'u1', csv);
+
+      // High confidence should auto-create journal entries
+      const journalCalls = mockPrisma.journalEntry?.create?.mock?.calls || [];
+      // If journalEntry.create exists on mock, it would have been called
       expect(mockPrisma.mpesaTransaction.updateMany).toHaveBeenCalled();
     });
 

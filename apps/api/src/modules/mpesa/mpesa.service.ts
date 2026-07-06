@@ -188,6 +188,34 @@ export class MpesaService {
             });
             categorized.push(tx.id);
             this.logger.log(`AI auto-mapped tx ${tx.id} to account ${account.code} (confidence: ${aiResult.confidence})`);
+
+            // Auto-post: If confidence >= 0.9, auto-create journal entry
+            if (aiResult.confidence >= 0.9 && tx.amount && tx.description) {
+              try {
+                const direction = account.type === 'INCOME' ? 'CREDIT' :
+                  account.type === 'EXPENSE' || account.type === 'ASSET' ? 'DEBIT' : 'CREDIT';
+
+                await this.prisma.journalEntry.create({
+                  data: {
+                    companyId,
+                    accountId: account.id,
+                    description: `AI-auto: ${tx.description}`,
+                    amount: tx.amount,
+                    direction,
+                    entryDate: tx.transactionDate || new Date(),
+                    postedById: userId || 'system',
+                    aiConfidence: aiResult.confidence,
+                    aiReasoning: aiResult.reasoning,
+                    reference: tx.receiptNo || null,
+                    serialNumber: `AI-${Date.now().toString(36).toUpperCase()}`,
+                  },
+                });
+                this.logger.log(`Auto-posted journal entry for tx ${tx.id} (confidence: ${aiResult.confidence})`);
+              } catch (journalError: any) {
+                this.logger.error(`Failed to auto-post journal entry for tx ${tx.id}: ${journalError.message}`);
+              }
+            }
+
             continue; // Skip HITL creation for this tx
           }
         }
