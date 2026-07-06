@@ -88,7 +88,28 @@ export class MpesaService {
     customerName?: string;
     transactionType?: string;
   }>, source: string) {
-    const parsedRows = transactions.map((tx) => ({
+    // Deduplicate: check which receipt numbers already exist
+    const existingReceipts = new Set<string>();
+    const receiptNos = transactions
+      .map(t => t.receiptNo)
+      .filter((r): r is string => !!r);
+
+    if (receiptNos.length > 0) {
+      const existing = await this.prisma.mpesaTransaction.findMany({
+        where: { companyId, receiptNo: { in: receiptNos } },
+        select: { receiptNo: true },
+      });
+      existing.forEach(t => { if (t.receiptNo) existingReceipts.add(t.receiptNo); });
+    }
+
+    const newTx = transactions.filter(t => !t.receiptNo || !existingReceipts.has(t.receiptNo));
+    const duplicates = transactions.length - newTx.length;
+
+    if (newTx.length === 0) {
+      return { imported: 0, categorized: 0, duplicates, source, message: `All ${duplicates} transactions were already imported` };
+    }
+
+    const parsedRows = newTx.map((tx) => ({
       companyId,
       receiptNo: tx.receiptNo || null,
       transactionDate: tx.transactionDate,
@@ -113,12 +134,30 @@ export class MpesaService {
         .catch(() => {});
     }
 
+    const parts = [`Successfully imported ${created.length} transactions from ${source}`];
+    if (duplicates > 0) parts.push(`${duplicates} duplicates skipped`);
     return {
       imported: created.length,
       categorized: categorized.length,
+      duplicates,
       source,
-      message: `Successfully imported ${created.length} transactions from ${source}`,
+      message: parts.join('. '),
     };
+  }
+
+  async deleteTransactions(companyId: string, receiptNos: string[]) {
+    if (receiptNos.length === 0) return { deleted: 0 };
+    const result = await this.prisma.mpesaTransaction.deleteMany({
+      where: { companyId, receiptNo: { in: receiptNos } },
+    });
+    return { deleted: result.count };
+  }
+
+  async deleteAllTransactions(companyId: string) {
+    const result = await this.prisma.mpesaTransaction.deleteMany({
+      where: { companyId },
+    });
+    return { deleted: result.count };
   }
 
   async findTransactions(companyId: string, filters?: {

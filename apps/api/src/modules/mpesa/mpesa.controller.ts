@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Query, Req, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Delete, Body, Param, Query, Req, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MpesaService } from './mpesa.service';
 import { PdfParserService } from './pdf-parser.service';
@@ -51,5 +51,20 @@ export class MpesaController {
     @Body() body: { accountId: string },
   ) {
     return this.mpesaService.mapToAccount(transactionId, body.accountId);
+  }
+
+  @Delete('transactions')
+  deleteTransactions(
+    @Req() req: any,
+    @Query('receiptNo') receiptNo?: string,
+    @Body() body?: { receiptNos?: string[] },
+  ) {
+    const receiptNos = receiptNo ? [receiptNo] : (body?.receiptNos || []);
+    return this.mpesaService.deleteTransactions(req.user.companyId, receiptNos);
+  }
+
+  @Delete('transactions/all')
+  deleteAll(@Req() req: any) {
+    return this.mpesaService.deleteAllTransactions(req.user.companyId);
   }
 }
