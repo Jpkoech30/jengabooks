@@ -1,14 +1,18 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { HitlService } from '../hitl/hitl.service';
+import { ReconciliationAgent } from '../ai/agents/reconciliation.agent';
 
 @Injectable()
 export class MpesaService {
+  private readonly logger = new Logger(MpesaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
     private readonly hitlService: HitlService,
+    private readonly reconciliationAgent: ReconciliationAgent,
   ) {}
 
   async uploadCsv(companyId: string, userId: string, csvData: string) {
@@ -147,6 +151,7 @@ export class MpesaService {
               mappedAccountId: account.id,
               category: matchingRule.keyword,
               isReconciled: true,
+              confidence: 0.95, // Rule-based = high confidence
             },
           });
           categorized.push(tx.id);
@@ -154,17 +159,60 @@ export class MpesaService {
       }
     }
 
-    // Auto-create HITL tasks for unmapped transactions (low confidence)
+    // For unmapped transactions, try AI reconciliation agent
     const unmappedTxns = transactions.filter((tx) => !categorized.includes(tx.id));
+
     for (const tx of unmappedTxns) {
-      await this.hitlService.create(companyId, {
-        category: 'UNMAPPED_DATA',
-        description: `M-Pesa transaction: KES ${tx.amount} — ${tx.description || 'No description'}`,
-        rawData: JSON.stringify(tx),
-        linkedEntityId: tx.id,
-        linkedEntityType: 'MPESA_TX',
-        confidence: 0,
-      }).catch(() => {});
+      try {
+        const aiResult = await this.reconciliationAgent.reconcile({
+          companyId,
+          description: tx.description || '',
+          amount: tx.amount || 0,
+          reference: tx.receiptNo || '',
+        });
+
+        if (aiResult.confidence >= 0.7 && aiResult.accountId !== 'suspense-account') {
+          // AI confidence >= 0.7: auto-map the transaction
+          const account = await this.prisma.chartOfAccount.findUnique({
+            where: { companyId_code: { companyId, code: aiResult.accountId } },
+          });
+
+          if (account) {
+            await this.prisma.mpesaTransaction.updateMany({
+              where: { id: tx.id },
+              data: {
+                mappedAccountId: account.id,
+                isReconciled: true,
+                confidence: aiResult.confidence,
+              },
+            });
+            categorized.push(tx.id);
+            this.logger.log(`AI auto-mapped tx ${tx.id} to account ${account.code} (confidence: ${aiResult.confidence})`);
+            continue; // Skip HITL creation for this tx
+          }
+        }
+
+        // Low confidence or no account: send to HITL with AI reasoning
+        await this.hitlService.create(companyId, {
+          category: 'UNMAPPED_DATA',
+          description: `M-Pesa: KES ${tx.amount} — ${tx.description || 'No description'}`,
+          rawData: JSON.stringify({ ...tx, aiReasoning: aiResult.reasoning }),
+          linkedEntityId: tx.id,
+          linkedEntityType: 'MPESA_TX',
+          confidence: aiResult.confidence || 0,
+        }).catch(() => {});
+      } catch (aiError: any) {
+        // AI agent failed: fall back to basic HITL creation
+        this.logger.warn(`AI agent failed for tx ${tx.id}: ${aiError.message}`);
+        await this.hitlService.create(companyId, {
+          category: 'UNMAPPED_DATA',
+          description: `M-Pesa: KES ${tx.amount} — ${tx.description || 'No description'}`,
+          rawData: JSON.stringify(tx),
+          linkedEntityId: tx.id,
+          linkedEntityType: 'MPESA_TX',
+          confidence: 0,
+        }).catch(() => {});
+      }
     }
 
     return categorized;
