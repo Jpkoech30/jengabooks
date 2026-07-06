@@ -80,9 +80,13 @@ export class MpesaService {
     transactionDate: Date;
     description: string;
     amount: number;
+    paidIn: number;
+    withdrawn: number;
     phoneNumber?: string;
     receiptNo?: string;
     paybill?: string;
+    customerName?: string;
+    transactionType?: string;
   }>, source: string) {
     const parsedRows = transactions.map((tx) => ({
       companyId,
