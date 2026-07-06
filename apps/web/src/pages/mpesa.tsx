@@ -3,7 +3,9 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { FileUpload } from '../components/ui/file-upload';
+import { Modal } from '../components/ui/modal';
 import { api, apiClient } from '../lib/api-client';
+import { showToast } from '../stores/ui-store';
 
 interface MpesaTx {
   id: string;
@@ -84,6 +86,26 @@ export function MpesaImport() {
     }
   };
 
+  const [deleteConfirm, setDeleteConfirm] = React.useState<{ open: boolean; type: 'single' | 'all'; receiptNo?: string }>({ open: false, type: 'all' });
+
+  const handleDeleteTransaction = async (receiptNo: string) => {
+    try {
+      await apiClient.delete(`/api/mpesa/transactions?receiptNo=${receiptNo}`);
+      showToast('success', 'Deleted', 'Transaction deleted successfully');
+      loadTransactions();
+    } catch { showToast('error', 'Failed', 'Could not delete transaction'); }
+    setDeleteConfirm({ open: false, type: 'single' });
+  };
+
+  const handleDeleteAll = async () => {
+    try {
+      await apiClient.delete('/api/mpesa/transactions/all');
+      showToast('success', 'Deleted', 'All transactions deleted successfully');
+      loadTransactions();
+    } catch { showToast('error', 'Failed', 'Could not delete transactions'); }
+    setDeleteConfirm({ open: false, type: 'all' });
+  };
+
   const handleCategorize = async (txId: string, accountId: string) => {
     try {
       await api.patch(`/mpesa/transactions/${txId}/categorize`, { accountId });
@@ -134,7 +156,14 @@ export function MpesaImport() {
       {/* Transactions Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Imported Transactions ({transactions.length})</CardTitle>
+          <div className="flex items-center justify-between w-full">
+            <CardTitle>Imported Transactions ({transactions.length})</CardTitle>
+            {transactions.length > 0 && (
+              <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm({ open: true, type: 'all' })}>
+                Delete All
+              </Button>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -155,6 +184,7 @@ export function MpesaImport() {
                     <th className="text-left py-3 px-3 font-medium text-gray-500">Phone</th>
                     <th className="text-left py-3 px-3 font-medium text-gray-500">Account</th>
                     <th className="text-center py-3 px-3 font-medium text-gray-500">Status</th>
+                    <th className="w-10 py-3 px-3" />
                   </tr>
                 </thead>
                 <tbody>
@@ -187,6 +217,15 @@ export function MpesaImport() {
                           {tx.isReconciled ? 'Mapped' : 'Unmapped'}
                         </Badge>
                       </td>
+                      <td className="py-3 px-1">
+                        <button
+                          onClick={() => setDeleteConfirm({ open: true, type: 'single', receiptNo: tx.receiptNo || undefined })}
+                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          aria-label="Delete transaction"
+                        >
+                          ✕
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -195,6 +234,37 @@ export function MpesaImport() {
           )}
         </CardContent>
       </Card>
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteConfirm.open}
+        onClose={() => setDeleteConfirm({ open: false, type: 'all' })}
+        title={deleteConfirm.type === 'all' ? 'Delete All Transactions' : 'Delete Transaction'}
+        size="sm"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button variant="secondary" size="md" className="flex-1" onClick={() => setDeleteConfirm({ open: false, type: 'all' })}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="md"
+              className="flex-1"
+              onClick={() => deleteConfirm.type === 'all' ? handleDeleteAll() : deleteConfirm.receiptNo && handleDeleteTransaction(deleteConfirm.receiptNo)}
+            >
+              {deleteConfirm.type === 'all' ? 'Delete All' : 'Delete'}
+            </Button>
+          </div>
+        }
+      >
+        <div className="py-2">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            {deleteConfirm.type === 'all'
+              ? 'Are you sure you want to delete all imported transactions? This action cannot be undone.'
+              : 'Are you sure you want to delete this transaction? This action cannot be undone.'}
+          </p>
+        </div>
+      </Modal>
     </div>
   );
 }
