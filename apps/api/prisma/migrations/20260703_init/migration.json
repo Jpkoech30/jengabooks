@@ -1,0 +1,9 @@
+{
+  "version": "5.22.0",
+  "started_at": "2026-07-03T07:59:00.000Z",
+  "finished_at": "2026-07-03T07:59:10.000Z",
+  "checksum": "init",
+  "datamodel": "",
+  "datamodel_steps": [],
+  "migration_name": "20260703_init"
+}

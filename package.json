@@ -1,0 +1,31 @@
+{
+  "name": "jengabooks",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
+  },
+  "packageManager": "npm@11.16.0",
+  "devDependencies": {
+    "prettier": "^3.2.0",
+    "turbo": "^2.0.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "allowScripts": {
+    "@prisma/client@5.22.0": true,
+    "@prisma/engines@5.22.0": true,
+    "prisma@5.22.0": true
+  },
+  "peerDependencies": {
+    "@nestjs/throttler": "^6.5.0"
+  }
+}

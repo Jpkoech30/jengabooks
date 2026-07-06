@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+.next/
+.turbo/
+*.tsbuildinfo
+
+# Environment (keep .env.example for onboarding templates)
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Coverage
+coverage/
+
+# Temp / artifacts
+$null
+
+# Expo / React Native
+.expo/
+
+# Internal planning docs (not part of source)
+plans/

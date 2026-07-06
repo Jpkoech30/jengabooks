@@ -1,0 +1,323 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id              String   @id @default(uuid())
+  name            String
+  tier            String   @default("BRONZE")
+  kraPin          String?
+  kraClientId     String?
+  isActive        Boolean  @default(true)
+  parentCompanyId String?
+  parentCompany   Company? @relation("CompanyHierarchy", fields: [parentCompanyId], references: [id])
+  childCompanies  Company[] @relation("CompanyHierarchy")
+  members         CompanyMember[]
+  chartOfAccounts ChartOfAccount[]
+  journalEntries  JournalEntry[]
+  fiscalPeriods   FiscalPeriod[]
+  pendingReviews  PendingReview[]
+  invoices        Invoice[]
+  mpesaTransactions MpesaTransaction[]
+  bankTransactions  BankTransaction[]
+  categoryRules   CategoryRule[]
+  healthScores    BusinessHealthScore[]
+  xpRecords       XPRecord[]
+  syncLogs        SyncLog[]
+  aiFeedbackLogs  AiFeedbackLog[]
+  userLevels      UserLevel[]
+  wizardProgress  WizardProgress[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("companies")
+}
+
+model CompanyMember {
+  id        String @id @default(uuid())
+  userId    String
+  user      User   @relation(fields: [userId], references: [id])
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  role      String
+  isActive  Boolean @default(true)
+  @@unique([userId, companyId])
+  @@map("company_members")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  memberships    CompanyMember[]
+  postedEntries  JournalEntry[]
+  xpRecords      XPRecord[]
+  userLevels     UserLevel[]
+  assignedReviews PendingReview[] @relation("AssignedReviews")
+  resolvedReviews PendingReview[] @relation("ResolvedReviews")
+  @@map("users")
+}
+
+model ChartOfAccount {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  code      String
+  name      String
+  type      String
+  isActive  Boolean  @default(true)
+  parentId  String?
+  parent    ChartOfAccount? @relation("AccountHierarchy", fields: [parentId], references: [id])
+  children  ChartOfAccount[] @relation("AccountHierarchy")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  deletedAt DateTime?
+  journalEntries JournalEntry[]
+  mpesaMappings  MpesaTransaction[]
+  bankMappings   BankTransaction[]
+  @@unique([companyId, code])
+  @@map("chart_of_accounts")
+}
+
+model JournalEntry {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  accountId    String
+  account      ChartOfAccount @relation(fields: [accountId], references: [id])
+  description  String
+  amount       Float
+  direction    String
+  reference    String?
+  serialNumber String?
+  entryDate    DateTime
+  version      Int      @default(1)
+  postedById   String
+  postedBy     User     @relation(fields: [postedById], references: [id])
+  isReconciled Boolean @default(false)
+  aiConfidence Float?
+  aiReasoning  String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+  @@map("journal_entries")
+}
+
+model FiscalPeriod {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  status    String   @default("OPEN")
+  closedBy  String?
+  closedAt  DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([companyId, name])
+  @@map("fiscal_periods")
+}
+
+model Invoice {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  invoiceNumber String  @unique
+  customerName String
+  customerPin  String?
+  customerEmail String?
+  lineItems    String
+  subtotal     Float
+  vat          Float
+  total        Float
+  taxCode      String   @default("S")
+  status       String   @default("DRAFT")
+  dueDate      DateTime?
+  paidAt       DateTime?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  etimsSubmission ETIMSSubmission?
+  @@map("invoices")
+}
+
+model ETIMSSubmission {
+  id           String   @id @default(uuid())
+  invoiceId    String   @unique
+  invoice      Invoice  @relation(fields: [invoiceId], references: [id])
+  serialNumber String   @unique
+  xmlPayload   String
+  kraResponse  String?
+  status       String   @default("PENDING")
+  submittedAt  DateTime?
+  retryCount   Int      @default(0)
+  lastError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  @@map("etims_submissions")
+}
+
+model MpesaTransaction {
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  receiptNo     String?
+  transactionDate DateTime
+  description   String
+  amount        Float
+  phoneNumber   String?
+  paybill       String?
+  rawCsv        String?
+  mappedAccountId String?
+  mappedAccount ChartOfAccount? @relation(fields: [mappedAccountId], references: [id])
+  confidence    Float?
+  isReconciled  Boolean  @default(false)
+  category      String?
+  createdAt     DateTime @default(now())
+  @@map("mpesa_transactions")
+}
+
+model BankTransaction {
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  transactionDate DateTime
+  description   String
+  amount        Float
+  reference     String?
+  mappedAccountId String?
+  mappedAccount ChartOfAccount? @relation(fields: [mappedAccountId], references: [id])
+  isReconciled  Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  @@map("bank_transactions")
+}
+
+model CategoryRule {
+  id          String   @id @default(uuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  keyword     String
+  accountCode String
+  direction   String?
+  priority    Int      @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  @@map("category_rules")
+}
+
+model PendingReview {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  category        String
+  description     String
+  rawData         String?
+  conflictData    String?
+  status          String   @default("PENDING")
+  assignedTo      String?
+  assignedUser    User?    @relation("AssignedReviews", fields: [assignedTo], references: [id])
+  resolvedBy      String?
+  resolvedUser    User?    @relation("ResolvedReviews", fields: [resolvedBy], references: [id])
+  resolvedAt      DateTime?
+  xpAwarded       Int      @default(0)
+  resolution      String?
+  linkedEntityId  String?  // UUID of the related transaction
+  linkedEntityType String? // 'MPESA_TX' | 'JOURNAL_ENTRY' | 'INVOICE'
+  confidence      Float?   // AI confidence score that triggered the review
+  resolutionAction String? // 'APPROVED' | 'REJECTED' | 'EDITED'
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  @@map("pending_reviews")
+}
+
+model XPRecord {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  points    Int
+  reason    String
+  badge     String?
+  createdAt DateTime @default(now())
+  @@map("xp_records")
+}
+
+model UserLevel {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  level     Int      @default(1)
+  totalXp   Int      @default(0)
+  updatedAt DateTime @updatedAt
+  @@unique([userId, companyId])
+  @@map("user_levels")
+}
+
+model BusinessHealthScore {
+  id           String   @id @default(uuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  overallScore Float
+  pillarScores String
+  calculatedAt DateTime @default(now())
+  @@map("business_health_scores")
+}
+
+model AiFeedbackLog {
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  transactionId String?
+  agentType     String
+  inputData     String
+  outputData    String
+  reasoning     String?
+  wasAccepted   Boolean
+  userCorrection String?
+  confidence    Float?
+  createdAt     DateTime @default(now())
+  @@map("ai_feedback_logs")
+}
+
+model SyncLog {
+  id            String   @id @default(uuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  deviceId      String
+  entityType    String
+  entityId      String
+  status        String   @default("PENDING")
+  serverVersion Int?
+  deviceVersion Int?
+  conflictData  String?
+  resolvedAt    DateTime?
+  createdAt     DateTime @default(now())
+  @@map("sync_logs")
+}
+
+model WizardProgress {
+  id          String   @id @default(uuid())
+  userId      String
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  step        String
+  completedAt DateTime @default(now())
+  xpAwarded   Int      @default(0)
+  badgeAwarded String?
+
+  @@unique([userId, companyId, step])
+  @@map("wizard_progress")
+}

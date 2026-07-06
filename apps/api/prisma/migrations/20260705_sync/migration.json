@@ -1,0 +1,29 @@
+{
+  "version": "5.14.0",
+  "steps": [
+    {
+      "tag": "AlterColumn",
+      "table": "pending_reviews",
+      "column": "linkedEntityId",
+      "type": "Text"
+    },
+    {
+      "tag": "AlterColumn",
+      "table": "pending_reviews",
+      "column": "linkedEntityType",
+      "type": "Text"
+    },
+    {
+      "tag": "AlterColumn",
+      "table": "pending_reviews",
+      "column": "confidence",
+      "type": "Float"
+    },
+    {
+      "tag": "AlterColumn",
+      "table": "pending_reviews",
+      "column": "resolutionAction",
+      "type": "Text"
+    }
+  ]
+}
