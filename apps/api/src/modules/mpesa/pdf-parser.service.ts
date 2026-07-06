@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+const pdfParse = require('pdf-parse');
 
 interface ExtractedTransaction {
   transactionDate: Date;
@@ -7,16 +8,6 @@ interface ExtractedTransaction {
   phoneNumber?: string;
   receiptNo?: string;
   paybill?: string;
-}
-
-// pdf-parse v2 is ESM-only; lazy-init with dynamic import for CommonJS compat
-let _pdfParse: any = null;
-async function loadPdfParse(): Promise<any> {
-  if (!_pdfParse) {
-    const mod = await import('pdf-parse');
-    _pdfParse = mod.default || mod;
-  }
-  return _pdfParse;
 }
 
 @Injectable()
@@ -28,7 +19,6 @@ export class PdfParserService {
     rawText: string;
     bankType: 'mpesa' | 'bank' | 'unknown';
   }> {
-    const pdfParse = await loadPdfParse();
     const data = await pdfParse(buffer);
     const text = data.text;
 
