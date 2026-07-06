@@ -135,7 +135,7 @@ model Invoice {
   customerName String
   customerPin  String?
   customerEmail String?
-  lineItems    String
+  lineItems    Json     @default("[]")
   subtotal     Float
   vat          Float
   total        Float
@@ -271,7 +271,7 @@ model BusinessHealthScore {
   companyId    String
   company      Company  @relation(fields: [companyId], references: [id])
   overallScore Float
-  pillarScores String
+  pillarScores Json
   calculatedAt DateTime @default(now())
   @@map("business_health_scores")
 }
@@ -306,6 +306,25 @@ model SyncLog {
   resolvedAt    DateTime?
   createdAt     DateTime @default(now())
   @@map("sync_logs")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  action    String
+  entityType String
+  entityId  String?
+  oldValue  Json?
+  newValue  Json?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+  @@index([companyId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
 }
 
 model WizardProgress {
