@@ -19,7 +19,9 @@ export class PdfParserService {
     rawText: string;
     bankType: 'mpesa' | 'bank' | 'unknown';
   }> {
-    const data = await pdfParse(buffer);
+    // Ensure buffer is a proper Uint8Array for pdf-parse
+    const pdfBuffer = buffer instanceof Buffer ? new Uint8Array(buffer) : buffer;
+    const data = await pdfParse(pdfBuffer);
     const text = data.text;
 
     const bankType = this.detectBankType(text);

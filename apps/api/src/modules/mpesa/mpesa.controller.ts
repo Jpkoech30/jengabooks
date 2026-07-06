@@ -21,7 +21,9 @@ export class MpesaController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadPdf(@Req() req: any, @UploadedFile() file: any) {
     if (!file) throw new BadRequestException('PDF file is required');
-    if (file.mimetype !== 'application/pdf') throw new BadRequestException('Only PDF files are accepted');
+    // Accept both 'application/pdf' and generic 'application/octet-stream' or missing type
+    const isPdf = file.mimetype === 'application/pdf' || file.originalname?.endsWith('.pdf');
+    if (!isPdf) throw new BadRequestException('Only PDF files are accepted');
 
     const { transactions, bankType } = await this.pdfParserService.extractTransactions(file.buffer);
     if (transactions.length === 0) throw new BadRequestException('No transactions found in PDF');
