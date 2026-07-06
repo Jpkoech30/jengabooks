@@ -17,6 +17,7 @@ import { ETIMS } from './pages/etims';
 import { MpesaImport } from './pages/mpesa';
 import { HitlHub } from './pages/hitl-hub';
 import { Reports } from './pages/reports';
+import { Workflow } from './pages/workflow';
 import { Team } from './pages/team';
 import { Settings } from './pages/settings';
 import { Help } from './pages/help';
@@ -117,6 +118,7 @@ function App() {
             <Route path="/mpesa" element={<MpesaImport />} />
             <Route path="/hitl" element={<HitlHub />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/workflow" element={<Workflow />} />
             <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="/help" element={<Help />} />

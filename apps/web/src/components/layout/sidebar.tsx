@@ -15,6 +15,12 @@ interface NavSection {
 
 const sections: NavSection[] = [
   {
+    label: 'WORKFLOW',
+    items: [
+      { to: '/workflow', label: 'Monthly Workflow', icon: '📋' },
+    ],
+  },
+  {
     label: 'MAIN',
     items: [
       { to: '/', label: 'Dashboard', icon: '📊' },
