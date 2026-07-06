@@ -132,10 +132,34 @@ export function Reports() {
 
   const handleDownloadCsv = () => {
     if (!lastResult) return;
-    const keys = Object.keys(lastResult).filter((k) => typeof lastResult[k] !== 'object');
-    const csvRows = ['"' + keys.join('","') + '"'];
-    csvRows.push('"' + keys.map((k) => String(lastResult[k] ?? '')).join('","') + '"');
-    const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+    const rows: string[] = [];
+
+    // Handle array data (income, expenses, accounts)
+    const arrayFields = ['income', 'expenses', 'assets', 'liabilities', 'equity', 'accounts'];
+    for (const field of arrayFields) {
+      if (Array.isArray(lastResult[field]) && lastResult[field].length > 0) {
+        const items = lastResult[field];
+        rows.push(`"${field.toUpperCase()}"`);
+        const itemKeys = Object.keys(items[0]);
+        rows.push(itemKeys.map((k) => `"${k}"`).join(','));
+        for (const item of items) {
+          rows.push(itemKeys.map((k) => `"${item[k] ?? ''}"`).join(','));
+        }
+        rows.push('');
+      }
+    }
+
+    // Handle scalar fields (totals, metadata)
+    const scalarFields = Object.keys(lastResult).filter(
+      (k) => !arrayFields.includes(k) && typeof lastResult[k] !== 'object',
+    );
+    if (scalarFields.length > 0) {
+      rows.push('"SUMMARY"');
+      rows.push(scalarFields.map((k) => `"${k}"`).join(','));
+      rows.push(scalarFields.map((k) => `"${String(lastResult[k] ?? '')}"`).join(','));
+    }
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;

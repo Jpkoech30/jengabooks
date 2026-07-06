@@ -128,29 +128,8 @@ export function useHitlTasks() {
   });
 }
 
-export function useResolveHitlTask() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ taskId, resolution, action, correctedData }: {
-      taskId: string;
-      resolution: string;
-      action: 'APPROVE' | 'REJECT' | 'EDIT';
-      correctedData?: string;
-    }) =>
-      api.post(`/hitl/${taskId}/resolve`, {
-        resolution,
-        action,
-        xpAwarded: 50,
-        ...(correctedData ? { correctedData } : {}),
-      }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['hitl-tasks'] });
-      qc.invalidateQueries({ queryKey: ['gamification'] });
-      showToast('success', 'Task resolved', '+50 XP awarded');
-    },
-    onError: (err: any) => showToast('error', 'Failed to resolve', err?.response?.data?.message),
-  });
-}
+// useResolveHitlTask was removed — the HITL Hub page calls the API directly
+// via api.post() and handles the response inline, which is more flexible.
 
 // ─── Reports ────────────────────────────────────────────────────────────
 

@@ -158,6 +158,9 @@ export class GamificationService {
    * Get gamification profile for a user within a company
    */
   async getProfile(userId: string, companyId: string) {
+    // Check and auto-award any new badges based on activity
+    await this.checkAndAwardBadges(userId, companyId);
+
     const userLevel = await this.prisma.userLevel.findUnique({
       where: { userId_companyId: { userId, companyId } },
     });
@@ -225,6 +228,9 @@ export class GamificationService {
    * Get badges (earned + available) for a user within a company
    */
   async getBadges(userId: string, companyId: string) {
+    // Check and auto-award any new badges based on activity
+    await this.checkAndAwardBadges(userId, companyId);
+
     // Get earned badges (badges with non-null badge field in XPRecord)
     const earnedBadgeRecords = await this.prisma.xPRecord.findMany({
       where: { userId, companyId, badge: { not: null } },
@@ -259,6 +265,107 @@ export class GamificationService {
       earned: earnedBadges,
       available: availableBadges,
     };
+  }
+
+  /**
+   * Auto-detect and award badges by checking actual user activity
+   * This is called when checking the user's gamification profile
+   */
+  async checkAndAwardBadges(userId: string, companyId: string): Promise<string[]> {
+    const newlyAwarded: string[] = [];
+
+    // Get already earned badges
+    const earnedRecords = await this.prisma.xPRecord.findMany({
+      where: { userId, companyId, badge: { not: null } },
+      distinct: ['badge'],
+      select: { badge: true },
+    });
+    const earnedBadgeNames = new Set(earnedRecords.map((r) => r.badge).filter(Boolean));
+
+    // Check each badge condition
+    // 📚 Accountant — Set up Chart of Accounts
+    if (!earnedBadgeNames.has('Accountant')) {
+      const accountCount = await this.prisma.chartOfAccount.count({
+        where: { companyId },
+      });
+      if (accountCount >= 5) {
+        await this.awardXp(userId, companyId, 25, 'Earned badge: Accountant', 'Accountant');
+        newlyAwarded.push('Accountant');
+      }
+    }
+
+    // 📱 M-Pesa Connected — Has M-Pesa transactions
+    if (!earnedBadgeNames.has('M-Pesa Connected')) {
+      const mpesaCount = await this.prisma.mpesaTransaction.count({
+        where: { companyId },
+      });
+      if (mpesaCount > 0) {
+        await this.awardXp(userId, companyId, 25, 'Earned badge: M-Pesa Connected', 'M-Pesa Connected');
+        newlyAwarded.push('M-Pesa Connected');
+      }
+    }
+
+    // 📊 Data Driven — Imported first CSV
+    if (!earnedBadgeNames.has('Data Driven')) {
+      const mpesaCount = await this.prisma.mpesaTransaction.count({
+        where: { companyId },
+      });
+      if (mpesaCount > 0) {
+        await this.awardXp(userId, companyId, 25, 'Earned badge: Data Driven', 'Data Driven');
+        newlyAwarded.push('Data Driven');
+      }
+    }
+
+    // 💰 First Income — Recorded first income entry
+    if (!earnedBadgeNames.has('First Income')) {
+      const incomeCount = await this.prisma.journalEntry.count({
+        where: { companyId, account: { type: 'INCOME' } },
+      });
+      if (incomeCount > 0) {
+        await this.awardXp(userId, companyId, 25, 'Earned badge: First Income', 'First Income');
+        newlyAwarded.push('First Income');
+      }
+    }
+
+    // 💳 First Expense — Recorded first expense entry
+    if (!earnedBadgeNames.has('First Expense')) {
+      const expenseCount = await this.prisma.journalEntry.count({
+        where: { companyId, account: { type: 'EXPENSE' } },
+      });
+      if (expenseCount > 0) {
+        await this.awardXp(userId, companyId, 25, 'Earned badge: First Expense', 'First Expense');
+        newlyAwarded.push('First Expense');
+      }
+    }
+
+    // 🛡️ Tax Compliant — Submitted first eTIMS invoice
+    if (!earnedBadgeNames.has('Tax Compliant')) {
+      const submissionCount = await this.prisma.eTIMSSubmission.count({
+        where: { invoice: { companyId }, status: 'ACCEPTED' },
+      });
+      if (submissionCount > 0) {
+        await this.awardXp(userId, companyId, 50, 'Earned badge: Tax Compliant', 'Tax Compliant');
+        newlyAwarded.push('Tax Compliant');
+      }
+    }
+
+    // 📈 Analyst — Generated first report
+    if (!earnedBadgeNames.has('Analyst')) {
+      // Reports are generated via the reports service — we check if they have enough data
+      const entryCount = await this.prisma.journalEntry.count({
+        where: { companyId },
+      });
+      if (entryCount >= 5) {
+        await this.awardXp(userId, companyId, 25, 'Earned badge: Analyst', 'Analyst');
+        newlyAwarded.push('Analyst');
+      }
+    }
+
+    if (newlyAwarded.length > 0) {
+      this.logger.log(`Badges auto-awarded for user ${userId}: ${newlyAwarded.join(', ')}`);
+    }
+
+    return newlyAwarded;
   }
 
   /**
