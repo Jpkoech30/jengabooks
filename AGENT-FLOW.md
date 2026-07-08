@@ -163,9 +163,9 @@
 - 13 unit tests all passing - validation, rate mapping, exempt, mixed, partial periods 
 
 
-### Sprint 9.4 ó Client Document Portal Backend (2026-07-08)
+### Sprint 9.4 ÔøΩ Client Document Portal Backend (2026-07-08)
 
-**Commit:* [`1f618af`](-) ó feat(documents): add document portal backend with upload, version control, and download
+**Commit:* [`1f618af`](-) ÔøΩ feat(documents): add document portal backend with upload, version control, and download
 
 ### Files Changed
 | File | Change | Purpose |
@@ -182,14 +182,14 @@
 | apps/api/src/app.module.ts | Modified | Registered DocumentsModule |
 
 ### API Endpoints
-- POST /api/v1/documents/upload ó Upload document (multipart, max 20MB)
-- GET /api/v1/documents?companyId=&category= ó List documents (cursor pagination, filterable)
-- GET /api/v1/documents/:id ó Get document metadata
-- GET /api/v1/documents/:id/download?version=N ó Stream file download (defaults to latest)
-- PATCH /api/v1/documents/:id ó Update metadata (description, tags, category)
-- DELETE /api/v1/documents/:id ó Soft-delete
-- POST /api/v1/documents/:id/versions ó Upload new version (increments currentVersion)
-- GET /api/v1/documents/:id/versions ó List all versions
+- POST /api/v1/documents/upload ÔøΩ Upload document (multipart, max 20MB)
+- GET /api/v1/documents?companyId=&category= ÔøΩ List documents (cursor pagination, filterable)
+- GET /api/v1/documents/:id ÔøΩ Get document metadata
+- GET /api/v1/documents/:id/download?version=N ÔøΩ Stream file download (defaults to latest)
+- PATCH /api/v1/documents/:id ÔøΩ Update metadata (description, tags, category)
+- DELETE /api/v1/documents/:id ÔøΩ Soft-delete
+- POST /api/v1/documents/:id/versions ÔøΩ Upload new version (increments currentVersion)
+- GET /api/v1/documents/:id/versions ÔøΩ List all versions
 
 ### Edge Cases Handled
 - File >20MB or  returns 413 Payload Too Large
@@ -201,8 +201,43 @@
 
 ### Compliance Checks
 - SENTINEL: No MISSING_API_DATA, TODO, FIXME, invented endpoints, fake response shapes, hardcoded secrets
-- TIME-TRAVEL: No new Date() or Date.now() ó all timestamps from @default(now()) (Prisma/DB)
+- TIME-TRAVEL: No new Date() or Date.now() ‚Äî all timestamps from @default(now()) (Prisma/DB)
 - UNIT TEST: 17/17 new documents tests pass; 436/439 total API tests pass (3 pre-existing auth failures remain)
 - FEATURE-CREEP: Only files listed in the task were created/modified
-- GROUNDING: Followed existing NestJ patterns (collaboration module as reference)
+- GROUNDING: Followed existing NestJS patterns (collaboration module as reference)
+
+---
+
+## Sprint 10.1 ‚Äî Lock-Down Periods + External Access DB Schema
+
+**Commit:** [`42a5b8c`] ‚Äî `feat(db): add audit locks, external access, and access log tables`
+
+**Agent:** [`üóÑÔ∏è Backend Database`]
+
+### Files Changed
+| File | Change | Purpose |
+|------|--------|---------|
+| [`apps/api/prisma/schema.prisma`](jengabooks/apps/api/prisma/schema.prisma) | Modified | Added 3 new models (`AuditLock`, `ExternalAccess`, `ExternalAccessLog`) + Company/User relations |
+| **NEW** [`apps/api/prisma/migrations/20260708_add_audit_locks_and_external_access/migration.sql`](jengabooks/apps/api/prisma/migrations/20260708_add_audit_locks_and_external_access/migration.sql) | New file | PostgreSQL migration SQL with CREATE TABLE + indexes + foreign keys |
+| **NEW** [`apps/api/prisma/migrations/20260708_add_audit_locks_and_external_access/migration.json`](jengabooks/apps/api/prisma/migrations/20260708_add_audit_locks_and_external_access/migration.json) | New file | Prisma migration metadata (version 5.22) |
+
+### Changes Summary
+1. **`AuditLock`** ‚Äî Fiscal period lock-down with `lockType` (FULL/MODULE_SPECIFIC/ROLE_BASED), `status` (OPEN/LOCKED/AMENDED), `modules` (JSON array), `roleOverrides` (JSON mapping). Unique constraint on `[companyId, fiscalYear, periodStart]` prevents overlapping lock periods. Compound index `[companyId, fiscalYear, periodStart, periodEnd]` enables overlap range detection in application code.
+2. **`ExternalAccess`** ‚Äî Temporary external access grants with unique `accessToken` (indexed for O(1) auth lookup), `expiresAt` index for scheduled auto-expiry, `isRevoked` flag for immediate termination. Compound index `[companyId, isRevoked]` for listing active grants per tenant.
+3. **`ExternalAccessLog`** ‚Äî Immutable audit trail retaining all actions (VIEW_REPORT, DOWNLOAD_DOCUMENT, LIST_TRANSACTIONS). Indexed on `[accessId, createdAt]` for chronological log queries. No cascade delete ‚Äî logs persist indefinitely for KRA 5-year audit compliance.
+4. **Relations** ‚Äî `Company` gains `auditLocks[]` and `externalAccessGrants[]`. `User` gains `auditLocksLocked[]` (lockedBy), `unlockRequestedLocks[]` (unlockRequestedBy), and `externalAccessGrants[]` (grantor). Disambiguated via named `@relation("AuditLockLocker")` and `@relation("AuditLockUnlocker")`.
+
+### Edge Cases Handled
+- **Overlapping lock periods** ‚Äî `@@unique([companyId, fiscalYear, periodStart])` prevents duplicate start dates per company/fiscal year; compound index enables range overlap queries in application code
+- **Expired external access** ‚Äî `expiresAt` indexed for scheduled cleanup queries; records preserved for audit trail rather than hard-deleted
+- **Revoked access** ‚Äî `isRevoked = true` takes immediate effect; no undo path (access cannot be un-revoked ‚Äî consistent with KRA audit requirements)
+- **Access log retention** ‚Äî No cascade delete from `ExternalAccess` to `ExternalAccessLog`; logs kept indefinitely even after parent access grant expires
+- **Non-interactive migration** ‚Äî `prisma migrate dev` requires interactive TTY, so migration SQL was hand-crafted following existing migration patterns exactly
+
+### Compliance Checks
+- SENTINEL: No MISSING_API_DATA, TODO, FIXME, invented endpoints, fake response shapes, hardcoded secrets
+- TIME-TRAVEL: All timestamps use `@default(now())` (DB-provided) ‚Äî zero `new Date()` violations
+- FEATURE-CREEP: Only the 3 specified models were added; no scope additions or while-youre-at-it changes
+- GROUNDING: Followed existing Prisma schema patterns (snake_case `@@map`, uuid IDs, `companyId`+`Company` relation, compound indexes)
+- UNIT TEST: Schema-level task ‚Äî no service layer to test; migration SQL is declarative DDL
 
