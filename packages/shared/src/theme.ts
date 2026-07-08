@@ -7,9 +7,9 @@ export const THEME = {
     400: '#338757',
     500: '#0A5C36',  // Acacia Green - Primary
     600: '#084A2B',
-    700: '#064523',
+    700: '#0A4D2E',
     800: '#04301A',
-    900: '#032E17',
+    900: '#0A3B1F',
   },
   secondary: {
     50: '#FEF5E0',
@@ -23,11 +23,37 @@ export const THEME = {
     800: '#875900',
     900: '#664000',
   },
+  accent: {
+    red: {
+      50: '#FEF2F2',
+      100: '#FEE2E2',
+      200: '#FECACA',
+      300: '#FCA5A5',
+      400: '#F87171',
+      500: '#BB1E10',  // Kenyan Red
+      600: '#991A0D',
+      700: '#7A140A',
+      800: '#5C0F08',
+      900: '#3D0A05',
+    },
+    gray: {
+      50: '#F9FAFB',
+      100: '#F3F4F6',
+      200: '#E5E7EB',
+      300: '#D1D5DB',
+      400: '#9CA3AF',
+      500: '#6B7280',
+      600: '#4B5563',
+      700: '#374151',
+      800: '#1F2937',
+      900: '#111827',
+    },
+  },
   semantic: {
-    success: '#0A7D3C',
-    warning: '#D97706',
-    error: '#BB1E10',  // Kenyan Red
-    info: '#3B82F6',
+    success: '#059669',  // Emerald-600
+    warning: '#D97706',  // Amber-600
+    error: '#BB1E10',    // Kenyan Red
+    info: '#2563EB',     // Blue-600
   },
   surface: {
     light: '#FBF8F1',  // Warm off-white, reduces glare
