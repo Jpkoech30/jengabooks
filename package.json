@@ -7,6 +7,10 @@
   ],
   "scripts": {
     "dev": "turbo dev",
+    "dev:full": "node scripts/wait-for-services.js && turbo dev",
+    "dev:check-services": "node scripts/wait-for-services.js",
+    "dev:web": "turbo dev --filter=@jengabooks/web",
+    "dev:api": "turbo dev --filter=@jengabooks/api",
     "build": "turbo build",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,js,json,md}\""
