@@ -9,6 +9,7 @@ import { IncomeForm } from '../components/forms/income-form';
 import { ExpenseForm } from '../components/forms/expense-form';
 import { showToast } from '../stores/ui-store';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCompanyRefresh } from '../hooks/use-company-refresh';
 import { useJournalEntries } from '../hooks/use-api';
 import { api } from '../lib/api-client';
 import { formatKES, formatDate } from '../lib/utils';

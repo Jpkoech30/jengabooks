@@ -1,4 +1,5 @@
 import React from 'react';
+import { useCompanyRefresh } from '../hooks/use-company-refresh';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
@@ -46,6 +47,7 @@ function TypeBadge({ type }: { type: string | null }) {
 }
 
 export function MpesaImport() {
+  const { refreshKey } = useCompanyRefresh();
   const [transactions, setTransactions] = React.useState<MpesaTx[]>([]);
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -72,7 +74,7 @@ export function MpesaImport() {
   React.useEffect(() => {
     loadTransactions();
     loadAccounts();
-  }, []);
+  }, [refreshKey]);
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;

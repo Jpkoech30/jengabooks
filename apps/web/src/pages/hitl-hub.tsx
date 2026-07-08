@@ -4,6 +4,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { XPBar } from '../components/ui/xp-bar';
+import { useCompanyRefresh } from '../hooks/use-company-refresh';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
 
