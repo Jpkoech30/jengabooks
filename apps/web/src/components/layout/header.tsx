@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth-store';
+import { useUiStore } from '../../stores/ui-store';
 import { useGamificationProfile } from '../../hooks/use-api';
 
 interface HeaderProps {
@@ -33,6 +34,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const logout = useAuthStore((state) => state.logout);
   const switchCompany = useAuthStore((state) => state.switchCompany);
   const { data: gamification } = useGamificationProfile();
+  const darkMode = useUiStore((state) => state.darkMode);
+  const toggleDarkMode = useUiStore((state) => state.toggleDarkMode);
 
   // Determine page title from current path
   const currentPath = '/' + location.pathname.split('/').filter(Boolean)[0];
@@ -99,6 +102,15 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
       {/* Right: Actions */}
       <div className="flex items-center gap-3">
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleDarkMode}
+          className="touch-target flex h-12 w-12 items-center justify-center rounded-lg text-gray-500 hover:bg-kenya-green-50 dark:hover:bg-kenya-green-900"
+          aria-label={darkMode ? 'Switch to light mode' : 'Switch to dark mode'}
+        >
+          <span aria-hidden="true">{darkMode ? '☀️' : '🌙'}</span>
+        </button>
+
         {/* Notifications */}
         <div className="relative">
           <button
