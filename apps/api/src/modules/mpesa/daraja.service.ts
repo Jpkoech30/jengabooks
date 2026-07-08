@@ -310,7 +310,8 @@ export class DarajaService {
     signatureHeader?: string,
   ): boolean {
     // If no passkey configured, skip validation in sandbox/dev
-    if (this.environment === 'sandbox' || !this.passkey) {
+    const currentEnv = process.env.MPESA_ENVIRONMENT || this.environment;
+    if (currentEnv === 'sandbox' || !this.passkey) {
       this.logger.debug('Skipping webhook signature validation in sandbox mode');
       return true;
     }
