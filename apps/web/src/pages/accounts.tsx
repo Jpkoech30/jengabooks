@@ -1,4 +1,5 @@
 import React from 'react';
+import { z } from 'zod';
 import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
@@ -10,6 +11,7 @@ import { PageShell } from '../components/layout/page-shell';
 import { PageState } from '../components/ui/page-state';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
+import { createAccountSchema } from '@jengabooks/shared/schemas';
 
 interface Account {
   id: string;
@@ -41,6 +43,7 @@ export function Accounts() {
   const [formData, setFormData] = React.useState({ code: '', name: '', type: 'EXPENSE', parentId: '' });
   const [saving, setSaving] = React.useState(false);
   const [search, setSearch] = React.useState('');
+  const [formErrors, setFormErrors] = React.useState<Record<string, string>>({});
 
   const invalidateAccounts = () => {
     queryClient.invalidateQueries({ queryKey: ['accounts'] });
@@ -127,13 +130,23 @@ export function Accounts() {
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
-    createMutation.mutate({
+    setFormErrors({});
+    const result = createAccountSchema.safeParse({
       code: formData.code,
       name: formData.name,
       type: formData.type,
       parentId: formData.parentId || undefined,
     });
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.issues.forEach((issue) => {
+        errors[issue.path[0] as string] = issue.message;
+      });
+      setFormErrors(errors);
+      return;
+    }
+    setSaving(true);
+    createMutation.mutate(result.data);
   };
 
   const handleUpdate = (e: React.FormEvent) => {
