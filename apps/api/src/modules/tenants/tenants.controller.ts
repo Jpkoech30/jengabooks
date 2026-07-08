@@ -66,4 +66,9 @@ export class TenantsController {
   removeMember(@Param('companyId') companyId: string, @Param('userId') userId: string) {
     return this.tenantsService.removeMember(companyId, userId);
   }
+
+  @Get('firm/dashboard')
+  getFirmDashboard(@Req() req: any) {
+    return this.tenantsService.getFirmDashboard(req.user.userId);
+  }
 }

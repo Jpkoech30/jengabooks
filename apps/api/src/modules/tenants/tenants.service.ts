@@ -194,4 +194,57 @@ export class TenantsService {
 
     return this.addMember(companyId, { userId: user.id, role: data.role });
   }
+
+  async getFirmDashboard(userId: string) {
+    // Get all companies the user is a member of
+    const memberships = await this.prisma.companyMember.findMany({
+      where: { userId, isActive: true },
+      include: { company: true },
+    });
+
+    // For each company, get health score and pending review count
+    const clients = await Promise.all(
+      memberships.map(async (m) => {
+        const healthScore = await this.prisma.businessHealthScore.findFirst({
+          where: { companyId: m.companyId },
+          orderBy: { calculatedAt: 'desc' },
+        });
+
+        const pendingReviews = await this.prisma.pendingReview.count({
+          where: { companyId: m.companyId, status: 'PENDING' },
+        });
+
+        const failedEtims = await this.prisma.eTIMSSubmission.count({
+          where: { invoice: { companyId: m.companyId }, status: 'FAILED' },
+        });
+
+        const totalEntries = await this.prisma.journalEntry.count({
+          where: { companyId: m.companyId, deletedAt: null },
+        });
+
+        return {
+          id: m.company.id,
+          name: m.company.name,
+          tier: m.company.tier,
+          role: m.role,
+          healthScore: healthScore?.overallScore || null,
+          pendingReviews,
+          failedEtims,
+          totalEntries,
+        };
+      }),
+    );
+
+    const needingAttention = clients.filter(
+      (c) => (c.healthScore !== null && c.healthScore < 60) || c.pendingReviews > 0 || c.failedEtims > 0,
+    );
+
+    return {
+      totalClients: clients.length,
+      needingAttention: needingAttention.length,
+      totalPendingReviews: clients.reduce((s, c) => s + c.pendingReviews, 0),
+      totalFailedEtims: clients.reduce((s, c) => s + c.failedEtims, 0),
+      clients,
+    };
+  }
 }
