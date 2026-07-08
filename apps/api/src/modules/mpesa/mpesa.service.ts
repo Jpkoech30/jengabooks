@@ -210,7 +210,7 @@ export class MpesaService {
     limit?: number;
   }) {
     const page = filters?.page || 1;
-    const limit = filters?.limit || 50;
+    const limit = filters?.limit || 200; // Show up to 200 per page by default
     const skip = (page - 1) * limit;
 
     const where: any = { companyId };
