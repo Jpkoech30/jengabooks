@@ -1,4 +1,4 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/auth-store';
@@ -7,23 +7,25 @@ import { useUiStore, showToast } from './stores/ui-store';
 import { ToastContainer, Toast } from './components/ui/toast';
 import { ErrorBoundary } from './components/ui/error-boundary';
 import { connectSocket, disconnectSocket } from './lib/socket-client';
-import { Dashboard } from './pages/dashboard';
-import { Login } from './pages/login';
-import { Register } from './pages/register';
-import { NotFound } from './pages/not-found';
-import { Ledger } from './pages/ledger';
-import { Accounts } from './pages/accounts';
-import { ETIMS } from './pages/etims';
-import { MpesaImport } from './pages/mpesa';
-import { HitlHub } from './pages/hitl-hub';
-import { Reports } from './pages/reports';
-import { Workflow } from './pages/workflow';
-import { Team } from './pages/team';
-import { Settings } from './pages/settings';
-import { Help } from './pages/help';
 import { Sidebar } from './components/layout/sidebar';
 import { Header } from './components/layout/header';
 import { SyncStatusBanner } from './components/layout/sync-status-banner';
+
+// Lazy-loaded page components — only loaded when their route is visited
+const Dashboard = lazy(() => import('./pages/dashboard').then((m) => ({ default: m.Dashboard })));
+const Login = lazy(() => import('./pages/login').then((m) => ({ default: m.Login })));
+const Register = lazy(() => import('./pages/register').then((m) => ({ default: m.Register })));
+const NotFound = lazy(() => import('./pages/not-found').then((m) => ({ default: m.NotFound })));
+const Ledger = lazy(() => import('./pages/ledger').then((m) => ({ default: m.Ledger })));
+const Accounts = lazy(() => import('./pages/accounts').then((m) => ({ default: m.Accounts })));
+const ETIMS = lazy(() => import('./pages/etims').then((m) => ({ default: m.ETIMS })));
+const MpesaImport = lazy(() => import('./pages/mpesa').then((m) => ({ default: m.MpesaImport })));
+const HitlHub = lazy(() => import('./pages/hitl-hub').then((m) => ({ default: m.HitlHub })));
+const Reports = lazy(() => import('./pages/reports').then((m) => ({ default: m.Reports })));
+const Workflow = lazy(() => import('./pages/workflow').then((m) => ({ default: m.Workflow })));
+const Team = lazy(() => import('./pages/team').then((m) => ({ default: m.Team })));
+const Settings = lazy(() => import('./pages/settings').then((m) => ({ default: m.Settings })));
+const Help = lazy(() => import('./pages/help').then((m) => ({ default: m.Help })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
