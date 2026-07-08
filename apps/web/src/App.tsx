@@ -37,6 +37,20 @@ const queryClient = new QueryClient({
   },
 });
 
+/** Loading indicator shown while lazy-loaded page chunks are fetched */
+function PageLoading() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-kenya-surface-light dark:bg-kenya-surface-dark">
+      <div className="text-center">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-kenya-green-500 text-2xl shadow-lg animate-pulse">
+          📚
+        </div>
+        <p className="text-gray-500 dark:text-gray-400">Loading page...</p>
+      </div>
+    </div>
+  );
+}
+
 function App() {
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const logout = useAuthStore((state) => state.logout);
@@ -81,26 +95,19 @@ function App() {
   }, [isAuthenticated, companyId, handleNotification]);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-kenya-surface-light dark:bg-kenya-surface-dark">
-        <div className="text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-kenya-green-500 text-2xl shadow-lg animate-pulse">
-            📚
-          </div>
-          <p className="text-gray-500 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageLoading />;
   }
 
   if (!isAuthenticated) {
     return (
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        {/* Proper 404 for unknown routes instead of silently redirecting to login */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense fallback={<PageLoading />}>
+        <Routes>
+          <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          {/* Proper 404 for unknown routes instead of silently redirecting to login */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
     );
   }
 
@@ -120,22 +127,24 @@ function App() {
         <Header onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <SyncStatusBanner />
         <main id="main-content" className="flex-1 overflow-y-auto p-6 scroll-smooth" tabIndex={-1}>
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/login" element={<Navigate to="/" replace />} />
-            <Route path="/ledger" element={<Ledger />} />
-            <Route path="/accounts" element={<Accounts />} />
-            <Route path="/etims" element={<ETIMS />} />
-            <Route path="/mpesa" element={<MpesaImport />} />
-            <Route path="/hitl" element={<HitlHub />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/reports/:category" element={<Reports />} />
-            <Route path="/workflow" element={<Workflow />} />
-            <Route path="/team" element={<Team />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="/help" element={<Help />} />
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <Suspense fallback={<PageLoading />}>
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/login" element={<Navigate to="/" replace />} />
+              <Route path="/ledger" element={<Ledger />} />
+              <Route path="/accounts" element={<Accounts />} />
+              <Route path="/etims" element={<ETIMS />} />
+              <Route path="/mpesa" element={<MpesaImport />} />
+              <Route path="/hitl" element={<HitlHub />} />
+              <Route path="/reports" element={<Reports />} />
+              <Route path="/reports/:category" element={<Reports />} />
+              <Route path="/workflow" element={<Workflow />} />
+              <Route path="/team" element={<Team />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="/help" element={<Help />} />
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
 
