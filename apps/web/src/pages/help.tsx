@@ -1,6 +1,7 @@
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { PageShell } from '../components/layout/page-shell';
 
 interface HelpArticle {
   id: string;
@@ -36,11 +37,10 @@ export function Help() {
   const categories = [...new Set(filtered.map((a) => a.category))];
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Help & Support</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Guides and documentation for JengaBooks</p>
-      </div>
+    <PageShell
+      title="Help & Support"
+      subtitle="Guides and documentation for JengaBooks"
+    >
 
       {/* Search */}
       <Card>
@@ -94,6 +94,6 @@ export function Help() {
           </div>
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }
