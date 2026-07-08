@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { HitlService } from '../hitl/hitl.service';
 import { ReconciliationAgent } from '../ai/agents/reconciliation.agent';
+import { DarajaService } from './daraja.service';
 import { BadRequestException } from '@nestjs/common';
 
 describe('MpesaService', () => {
@@ -16,7 +17,9 @@ describe('MpesaService', () => {
   const mockPrisma = {
     mpesaTransaction: {
       createManyAndReturn: jest.fn(),
+      create: jest.fn(),
       findMany: jest.fn(),
+      findFirst: jest.fn(),
       findUnique: jest.fn(),
       update: jest.fn(),
       updateMany: jest.fn(),
@@ -25,6 +28,8 @@ describe('MpesaService', () => {
     journalEntry: { create: jest.fn() },
     categoryRule: { findMany: jest.fn() },
     chartOfAccount: { findUnique: jest.fn(), findFirst: jest.fn() },
+    invoice: { findFirst: jest.fn(), update: jest.fn() },
+    company: { findFirst: jest.fn() },
   };
 
   // Mock the ReconciliationAgent to verify it's called
@@ -36,6 +41,18 @@ describe('MpesaService', () => {
     }),
   };
 
+  const mockDarajaService = {
+    isConfigured: false,
+    parseTransTime: jest.fn().mockReturnValue(new Date('2026-07-08T22:00:00Z')),
+    queryTransactionStatus: jest.fn(),
+    validateWebhookSignature: jest.fn().mockReturnValue(true),
+    validateC2BRequest: jest.fn().mockReturnValue({ ResultCode: 0, ResultDesc: 'Accepted' }),
+    generateSecurityCredential: jest.fn().mockReturnValue('dGVzdC1jcmVkZW50aWFs'),
+    generateTimestamp: jest.fn().mockReturnValue('20260708220000'),
+    getAccessToken: jest.fn().mockResolvedValue('test-token'),
+    refreshToken: jest.fn().mockResolvedValue('refreshed-token'),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -44,6 +61,7 @@ describe('MpesaService', () => {
         { provide: GamificationService, useValue: { awardXp: jest.fn().mockResolvedValue({}) } },
         { provide: HitlService, useValue: { create: jest.fn().mockResolvedValue({}) } },
         { provide: ReconciliationAgent, useValue: mockReconciliationAgent },
+        { provide: DarajaService, useValue: mockDarajaService },
       ],
     }).compile();
 

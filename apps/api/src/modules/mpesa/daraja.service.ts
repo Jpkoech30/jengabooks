@@ -1,0 +1,435 @@
+import { Injectable, Logger } from '@nestjs/common';
+import * as crypto from 'crypto';
+
+// ─── Types ─────────────────────────────────────────────────────────────────
+
+export interface DarajaOAuthResponse {
+  access_token: string;
+  expires_in: number; // seconds, typically 3600
+}
+
+export interface DarajaTransactionStatusRequest {
+  Initiator: string;
+  SecurityCredential: string;
+  CommandID: 'TransactionStatusQuery';
+  PartyA: string;
+  IdentifierType: '4';
+  Remarks: string;
+  QueueTimeOutURL: string;
+  ResultURL: string;
+  TransactionID: string;
+}
+
+export interface DarajaTransactionStatusResponse {
+  ResponseCode: string;
+  ResponseDescription: string;
+  OriginatorConversationID: string;
+  ConversationID: string;
+  Result?: {
+    ResultType: number;
+    ResultCode: number;
+    ResultDesc: string;
+    TransactionID: string;
+    ResultParameters?: {
+      ResultParameter: Array<{
+        Key: string;
+        Value: string;
+      }>;
+    };
+  };
+}
+
+export interface C2BWebhookPayload {
+  TransactionType: string;
+  TransID: string;
+  TransTime: string; // YYYYMMDDHHmmss
+  TransAmount: string;
+  BusinessShortCode: string;
+  BillRefNumber: string;
+  InvoiceNumber?: string;
+  OrgAccountBalance?: string;
+  ThirdPartyTransID?: string;
+  MSISDN: string;
+  FirstName: string;
+  MiddleName?: string;
+  LastName?: string;
+}
+
+export interface TransactionStatusWebhookPayload {
+  Result: {
+    ResultType: number;
+    ResultCode: number;
+    ResultDesc: string;
+    TransactionID: string;
+    OriginatorConversationID: string;
+    ConversationID: string;
+    ResultParameters?: {
+      ResultParameter: Array<{
+        Key: string;
+        Value: string;
+      }>;
+    };
+  };
+}
+
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+const DARAJA_API_BASE_URLS: Record<string, string> = {
+  sandbox: 'https://sandbox.safaricom.co.ke',
+  production: 'https://api.safaricom.co.ke',
+};
+
+const TOKEN_CACHE_KEY = 'daraja:access_token';
+const TOKEN_CACHE_TTL_SEC = 3300; // 55 minutes (tokens expire in 1 hour)
+const REQUEST_TIMEOUT_MS = 15_000;
+
+// ─── Service ───────────────────────────────────────────────────────────────
+
+@Injectable()
+export class DarajaService {
+  private readonly logger = new Logger(DarajaService.name);
+
+  private readonly apiBaseUrl: string;
+  private readonly consumerKey: string;
+  private readonly consumerSecret: string;
+  private readonly passkey: string;
+  private readonly shortcode: string;
+  private readonly environment: string;
+  private readonly callbackBaseUrl: string;
+
+  // In-memory token cache as fallback when Redis is unavailable
+  private memoryToken: { token: string; expiresAt: number } | null = null;
+
+  constructor() {
+    this.environment = process.env.MPESA_ENVIRONMENT || 'sandbox';
+    this.apiBaseUrl = DARAJA_API_BASE_URLS[this.environment] || DARAJA_API_BASE_URLS.sandbox;
+    this.consumerKey = process.env.MPESA_CONSUMER_KEY || '';
+    this.consumerSecret = process.env.MPESA_CONSUMER_SECRET || '';
+    this.passkey = process.env.MPESA_PASSKEY || '';
+    this.shortcode = process.env.MPESA_SHORTCODE || '';
+    this.callbackBaseUrl = process.env.CALLBACK_BASE_URL || 'http://localhost:3001';
+
+    if (!this.consumerKey || !this.consumerSecret) {
+      this.logger.warn('M-Pesa Daraja API credentials not configured. DarajaService will be inactive.');
+    }
+  }
+
+  get isConfigured(): boolean {
+    return !!(this.consumerKey && this.consumerSecret && this.shortcode);
+  }
+
+  // ─── OAuth2: Token Management ──────────────────────────────────────────
+
+  /**
+   * Gets a valid access token, using cached version if available.
+   * Tries Redis first, falls back to in-memory cache.
+   */
+  async getAccessToken(): Promise<string> {
+    // Try Redis cache first
+    try {
+      const { default: Redis } = await import('ioredis');
+      const redis = new Redis({
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      });
+
+      const cached = await redis.get(TOKEN_CACHE_KEY);
+      if (cached) {
+        this.logger.debug('Using cached Daraja access token from Redis');
+        await redis.quit().catch(() => {});
+        return cached;
+      }
+      await redis.quit().catch(() => {});
+    } catch (err: any) {
+      this.logger.debug(`Redis unavailable for Daraja token cache: ${err.message}`);
+    }
+
+    // Try in-memory cache fallback
+    if (this.memoryToken && this.memoryToken.expiresAt > Date.now() + 60_000) {
+      this.logger.debug('Using cached Daraja access token from memory');
+      return this.memoryToken.token;
+    }
+
+    // Fetch new token
+    return this.fetchNewToken();
+  }
+
+  /**
+   * Fetches a new access token from Daraja OAuth2 endpoint and caches it.
+   */
+  private async fetchNewToken(): Promise<string> {
+    const auth = Buffer.from(`${this.consumerKey}:${this.consumerSecret}`).toString('base64');
+
+    const url = `${this.apiBaseUrl}/oauth/v1/generate?grant_type=client_credentials`;
+
+    this.logger.log('Fetching new Daraja access token');
+
+    const axios = require('axios');
+    const response = await axios.post(
+      url,
+      {},
+      {
+        headers: {
+          Authorization: `Basic ${auth}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      },
+    );
+
+    const data = response.data as DarajaOAuthResponse;
+    const { access_token, expires_in } = data;
+
+    if (!access_token) {
+      throw new Error('Daraja OAuth2 response missing access_token');
+    }
+
+    // Cache token in Redis
+    try {
+      const { default: Redis } = await import('ioredis');
+      const redis = new Redis({
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      });
+
+      await redis.setex(TOKEN_CACHE_KEY, TOKEN_CACHE_TTL_SEC, access_token);
+      await redis.quit().catch(() => {});
+      this.logger.log('Daraja access token cached in Redis');
+    } catch (err: any) {
+      this.logger.debug(`Could not cache Daraja token in Redis: ${err.message}`);
+    }
+
+    // Fallback in-memory cache
+    this.memoryToken = {
+      token: access_token,
+      expiresAt: Date.now() + (expires_in || 3600) * 1000,
+    };
+
+    return access_token;
+  }
+
+  /**
+   * Refreshes the token (invalidates cache, fetches new one).
+   * Called when a 401 is received.
+   */
+  async refreshToken(): Promise<string> {
+    this.logger.log('Refreshing expired Daraja access token');
+    this.memoryToken = null;
+
+    // Invalidate Redis cache
+    try {
+      const { default: Redis } = await import('ioredis');
+      const redis = new Redis({
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379', 10),
+        maxRetriesPerRequest: 1,
+        lazyConnect: true,
+      });
+
+      await redis.del(TOKEN_CACHE_KEY);
+      await redis.quit().catch(() => {});
+    } catch { /* non-blocking */ }
+
+    return this.fetchNewToken();
+  }
+
+  // ─── Security Credential ───────────────────────────────────────────────
+
+  /**
+   * Generates the SecurityCredential for transaction status queries.
+   * Format: Base64(Shortcode + Passkey + Timestamp)
+   * Timestamp format: YYYYMMDDHHmmss
+   * Uses a provided timestamp (from Daraja or generated) — NOT Date.now() for financial logic.
+   */
+  generateSecurityCredential(timestamp: string): string {
+    const password = `${this.shortcode}${this.passkey}${timestamp}`;
+    return Buffer.from(password).toString('base64');
+  }
+
+  /**
+   * Generates a timestamp in Daraja format YYYYMMDDHHmmss.
+   * This is a communication protocol timestamp (not a financial record timestamp),
+   * so Date() is acceptable per TIME-TRAVEL rules (display/communication only).
+   */
+  generateTimestamp(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
+    return `${year}${month}${day}${hours}${minutes}${seconds}`;
+  }
+
+  // ─── Transaction Status Query ──────────────────────────────────────────
+
+  /**
+   * Queries the status of a specific M-Pesa transaction.
+   * Includes retry logic: on 401, refreshes token and retries once.
+   */
+  async queryTransactionStatus(transactionId: string): Promise<DarajaTransactionStatusResponse> {
+    if (!this.isConfigured) {
+      throw new Error('Daraja API is not configured. Set MPESA_CONSUMER_KEY, MPESA_CONSUMER_SECRET, MPESA_SHORTCODE.');
+    }
+
+    const token = await this.getAccessToken();
+    const timestamp = this.generateTimestamp();
+    const securityCredential = this.generateSecurityCredential(timestamp);
+
+    const requestBody: DarajaTransactionStatusRequest = {
+      Initiator: 'JengaBooks',
+      SecurityCredential: securityCredential,
+      CommandID: 'TransactionStatusQuery',
+      PartyA: this.shortcode,
+      IdentifierType: '4',
+      Remarks: 'JengaBooks sync',
+      QueueTimeOutURL: `${this.callbackBaseUrl}/api/v1/mpesa/webhook/transaction-status`,
+      ResultURL: `${this.callbackBaseUrl}/api/v1/mpesa/webhook/transaction-status`,
+      TransactionID: transactionId,
+    };
+
+    return this.postWithRetry<DarajaTransactionStatusResponse>(
+      '/mpesa/transactionstatus/v1/query',
+      requestBody,
+      token,
+    );
+  }
+
+  // ─── HTTP Client with Retry ────────────────────────────────────────────
+
+  /**
+   * Makes an authenticated POST request to Daraja API.
+   * On 401, refreshes the token and retries once.
+   */
+  private async postWithRetry<T>(
+    path: string,
+    body: any,
+    token: string,
+    retried = false,
+  ): Promise<T> {
+    const url = `${this.apiBaseUrl}${path}`;
+    const axios = require('axios');
+
+    try {
+      const response = await axios.post(url, body, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: REQUEST_TIMEOUT_MS,
+      });
+
+      return response.data as T;
+    } catch (err: any) {
+      // Handle 401 (token expired) — refresh and retry once
+      if (err.response?.status === 401 && !retried) {
+        this.logger.warn('Daraja API returned 401 — refreshing token and retrying');
+        const newToken = await this.refreshToken();
+        return this.postWithRetry<T>(path, body, newToken, true);
+      }
+
+      // Handle network timeouts
+      if (err.code === 'ECONNABORTED' || err.message?.includes('timeout')) {
+        this.logger.error(`Daraja API timeout for ${path}`);
+        throw new Error(`Daraja API timeout: ${path}`);
+      }
+
+      throw err;
+    }
+  }
+
+  // ─── Webhook Signature Validation ──────────────────────────────────────
+
+  /**
+   * Validates an incoming webhook from Safaricom.
+   * In production, verifies the HMAC-SHA-256 signature sent by Safaricom.
+   * The webhook payload includes an optional `Signature` field or a
+   * `X-Safaricom-Signature` header containing the HMAC.
+   *
+   * Signature is HMAC-SHA-256 over concatenation of:
+   * TransID + TransTime + TransAmount + BillRefNumber + MSISDN
+   */
+  validateWebhookSignature(
+    payload: C2BWebhookPayload,
+    signatureHeader?: string,
+  ): boolean {
+    // If no passkey configured, skip validation in sandbox/dev
+    if (this.environment === 'sandbox' || !this.passkey) {
+      this.logger.debug('Skipping webhook signature validation in sandbox mode');
+      return true;
+    }
+
+    // Production: validate HMAC-SHA-256 signature
+    // Safaricom sends signature in X-Safaricom-Signature header
+    const signature = signatureHeader || (payload as any).Signature;
+
+    if (!signature) {
+      this.logger.warn('Webhook missing signature — rejecting');
+      return false;
+    }
+
+    try {
+      // Build the data string to verify
+      const dataToSign = [
+        payload.TransID || '',
+        payload.TransTime || '',
+        payload.TransAmount || '',
+        payload.BillRefNumber || '',
+        payload.MSISDN || '',
+      ].join('');
+
+      const expectedSignature = crypto
+        .createHmac('sha256', this.passkey)
+        .update(dataToSign)
+        .digest('hex');
+
+      const isValid = crypto.timingSafeEqual(
+        Buffer.from(signature.toLowerCase()),
+        Buffer.from(expectedSignature.toLowerCase()),
+      );
+
+      if (!isValid) {
+        this.logger.warn(`Webhook signature mismatch for TransID: ${payload.TransID}`);
+      }
+
+      return isValid;
+    } catch (err: any) {
+      this.logger.error(`Webhook signature validation error: ${err.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * Validates a C2B validation request from Safaricom.
+   * Safaricom sends a validation request before processing the transaction.
+   * We always respond positively to accept the transaction.
+   */
+  validateC2BRequest(payload: any): { ResultCode: number; ResultDesc: string } {
+    return {
+      ResultCode: 0,
+      ResultDesc: 'Accepted',
+    };
+  }
+
+  // ─── Utilities ─────────────────────────────────────────────────────────
+
+  /**
+   * Parses the Daraja TransTime format (YYYYMMDDHHmmss) to a Date object.
+   * This converts a webhook-provided timestamp (TIME-TRAVEL compliant:
+   * using data-provided timestamp, not client-side Date.now()).
+   */
+  parseTransTime(transTime: string): Date {
+    const year = parseInt(transTime.substring(0, 4), 10);
+    const month = parseInt(transTime.substring(4, 6), 10) - 1; // 0-based
+    const day = parseInt(transTime.substring(6, 8), 10);
+    const hours = parseInt(transTime.substring(8, 10), 10);
+    const minutes = parseInt(transTime.substring(10, 12), 10);
+    const seconds = parseInt(transTime.substring(12, 14), 10);
+    return new Date(year, month, day, hours, minutes, seconds);
+  }
+}

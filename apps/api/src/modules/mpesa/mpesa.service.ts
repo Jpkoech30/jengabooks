@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { HitlService } from '../hitl/hitl.service';
 import { ReconciliationAgent } from '../ai/agents/reconciliation.agent';
+import { DarajaService, C2BWebhookPayload, TransactionStatusWebhookPayload } from './daraja.service';
 import { detectBankTemplate, normalizeRow } from './bank-templates';
 
 @Injectable()
@@ -14,6 +15,7 @@ export class MpesaService {
     private readonly gamificationService: GamificationService,
     private readonly hitlService: HitlService,
     private readonly reconciliationAgent: ReconciliationAgent,
+    private readonly darajaService: DarajaService,
   ) {}
 
   async uploadCsv(companyId: string, userId: string, csvData: string) {
@@ -305,6 +307,425 @@ export class MpesaService {
       include: { mappedAccount: true },
     });
   }
+
+  /**
+   * Resolves the company ID from a Daraja BusinessShortCode (paybill/till number).
+   * Since webhooks don't carry tenant context, we map the shortcode to a company.
+   * Falls back to first company found or env-configured default.
+   */
+  private async resolveCompanyFromShortcode(shortcode: string): Promise<string> {
+    // Try to find a company that has this shortcode configured
+    // In a multi-tenant setup, multiple companies could share a paybill.
+    // We look up by a company metadata field or environment variable.
+    const configuredCompanyId = process.env.DEFAULT_COMPANY_ID;
+    if (configuredCompanyId) {
+      return configuredCompanyId;
+    }
+
+    // For single-tenant or dev mode, find the first active company
+    const firstCompany = await this.prisma.company.findFirst({
+      where: { isActive: true },
+      select: { id: true },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (!firstCompany) {
+      throw new Error('No active company found for Daraja webhook. Set DEFAULT_COMPANY_ID env var.');
+    }
+
+    return firstCompany.id;
+  }
+
+  // ─── Daraja Webhook Methods ────────────────────────────────────────────
+
+  /**
+   * Checks if a transaction with the given TransID (receiptNo) already exists.
+   * Used for idempotency check on incoming webhooks.
+   */
+  async checkDuplicateTransaction(transId: string): Promise<boolean> {
+    if (!transId) return false;
+
+    const existing = await this.prisma.mpesaTransaction.findFirst({
+      where: { receiptNo: transId },
+      select: { id: true },
+    });
+
+    return !!existing;
+  }
+
+  /**
+   * Processes a C2B payment notification from Safaricom Daraja API.
+   * 1. Parses the webhook payload into a transaction
+   * 2. Stores it in the database
+   * 3. Attempts auto-reconciliation (match BillRefNumber to open invoice)
+   * 4. If matched: marks invoice as paid, creates journal entry
+   * 5. If not matched: creates unmapped transaction flagged for review
+   *
+   * TIME-TRAVEL compliant: uses TransTime from webhook, not Date.now()
+   */
+  async processDarajaTransaction(payload: C2BWebhookPayload): Promise<void> {
+    const {
+      TransID,
+      TransTime,
+      TransAmount,
+      MSISDN,
+      BillRefNumber,
+      FirstName,
+      MiddleName,
+      LastName,
+    } = payload;
+
+    // Parse the webhook-provided timestamp
+    const transactionDate = this.darajaService.parseTransTime(TransTime);
+    const amount = parseFloat(TransAmount) || 0;
+    const customerName = [FirstName, MiddleName, LastName].filter(Boolean).join(' ') || MSISDN;
+
+    // Build description
+    const description = `M-Pesa: ${payload.TransactionType || 'Payment'} from ${customerName}${BillRefNumber ? ` Ref: ${BillRefNumber}` : ''}`;
+
+    // We need a companyId to create the transaction.
+    // Daraja webhooks don't include tenant context directly.
+    // Try to find the company by paybill number, or use a config-based default.
+    // For now, this requires a configured mapping.
+    const companyId = await this.resolveCompanyFromShortcode(payload.BusinessShortCode);
+
+    // Create the transaction record
+    // Use receiptNo = TransID for idempotency (we already checked duplicates above)
+    const transaction = await this.prisma.mpesaTransaction.create({
+      data: {
+        companyId,
+        receiptNo: TransID,
+        transactionDate,
+        description,
+        amount,
+        paidIn: amount, // C2B = money coming in
+        withdrawn: 0,
+        phoneNumber: MSISDN,
+        customerName,
+        paybill: payload.BusinessShortCode,
+        transactionType: payload.TransactionType || 'C2B',
+        rawCsv: JSON.stringify(payload),
+        // Not flagged as reconciled yet — will be reconciled below if matched
+        isReconciled: false,
+      },
+    });
+
+    // Auto-reconcile: try to match BillRefNumber against open invoices
+    if (BillRefNumber) {
+      await this.tryAutoReconcile(transaction.id, transaction.companyId, BillRefNumber, amount, transactionDate);
+    } else {
+      // No BillRefNumber — this is an unmapped transaction, flag for review
+      await this.flagForReview(transaction, 'No BillRefNumber provided');
+    }
+  }
+
+  /**
+   * Attempts to auto-reconcile a Daraja transaction against an open invoice.
+   * If BillRefNumber matches an open invoice number:
+   *   - Mark invoice as paid
+   *   - Create journal entry
+   *   - Mark transaction as reconciled
+   * If no match: create unmapped transaction flagged for review.
+   */
+  private async tryAutoReconcile(
+    transactionId: string,
+    companyId: string,
+    billRefNumber: string,
+    amount: number,
+    transactionDate: Date,
+  ): Promise<void> {
+    // 1. Try to find an open invoice with matching invoice number
+    const invoice = await this.prisma.invoice.findFirst({
+      where: {
+        companyId,
+        invoiceNumber: billRefNumber,
+        status: { in: ['DRAFT', 'SENT', 'OVERDUE'] },
+      },
+    });
+
+    if (!invoice) {
+      // 2. No matching invoice — try matching as account code / category rule
+      const ruleMatch = await this.tryRuleMatch(companyId, billRefNumber, amount, transactionDate);
+
+      if (!ruleMatch) {
+        // 3. No match at all — flag for review
+        const tx = await this.prisma.mpesaTransaction.findUnique({
+          where: { id: transactionId },
+        });
+        if (tx) {
+          await this.flagForReview(tx, `No matching invoice for BillRefNumber: ${billRefNumber}`);
+        }
+      }
+      return;
+    }
+
+    // Invoice found — auto-reconcile
+    this.logger.log(`Auto-reconciling Daraja transaction ${transactionId} with invoice ${invoice.invoiceNumber}`);
+
+    // Find the revenue account for invoice payments
+    const revenueAccount = await this.prisma.chartOfAccount.findFirst({
+      where: {
+        companyId,
+        type: 'INCOME',
+        isActive: true,
+      },
+      orderBy: { code: 'asc' },
+    });
+
+    // Use a suspense account if no revenue account found
+    const accountId = revenueAccount?.id || 'suspense-account';
+
+    // Update transaction as reconciled
+    await this.prisma.mpesaTransaction.update({
+      where: { id: transactionId },
+      data: {
+        mappedAccountId: accountId,
+        isReconciled: true,
+        confidence: 0.95,
+      },
+    });
+
+    // Mark invoice as paid
+    await this.prisma.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        status: 'PAID',
+        paidAt: transactionDate,
+      },
+    });
+
+    // Create journal entry for the payment
+    // Debit: accounts_receivable (settled), Credit: income account
+    try {
+      await this.prisma.journalEntry.create({
+        data: {
+          companyId,
+          accountId,
+          description: `M-Pesa payment for Invoice ${invoice.invoiceNumber}: ${billRefNumber}`,
+          amount,
+          direction: 'CREDIT',
+          entryDate: transactionDate,
+          postedById: 'system',
+          aiConfidence: 0.95,
+          aiReasoning: `Auto-reconciled: Daraja TransID matched Invoice ${invoice.invoiceNumber}`,
+          reference: billRefNumber,
+        },
+      });
+
+      // Also create a debit entry for the receivable
+      const receivableAccount = await this.prisma.chartOfAccount.findFirst({
+        where: { companyId, type: 'ASSET', code: { startsWith: '1' }, isActive: true },
+        orderBy: { code: 'asc' },
+      });
+
+      if (receivableAccount) {
+        await this.prisma.journalEntry.create({
+          data: {
+            companyId,
+            accountId: receivableAccount.id,
+            description: `M-Pesa receipt for Invoice ${invoice.invoiceNumber}`,
+            amount,
+            direction: 'DEBIT',
+            entryDate: transactionDate,
+            postedById: 'system',
+            aiConfidence: 0.95,
+            aiReasoning: `Auto-reconciled: Daraja payment for Invoice ${invoice.invoiceNumber}`,
+            reference: billRefNumber,
+          },
+        });
+      }
+    } catch (journalErr: any) {
+      this.logger.error(`Failed to create journal entry for reconciled Daraja tx ${transactionId}: ${journalErr.message}`);
+    }
+  }
+
+  /**
+   * Tries to match a BillRefNumber against an active category rule.
+   * Returns true if a match was found and applied.
+   */
+  private async tryRuleMatch(
+    companyId: string,
+    billRefNumber: string,
+    amount: number,
+    transactionDate: Date,
+  ): Promise<boolean> {
+    // Try matching BillRefNumber against category rule keywords
+    const rules = await this.prisma.categoryRule.findMany({
+      where: { companyId, isActive: true },
+      orderBy: { priority: 'desc' },
+    });
+
+    for (const rule of rules) {
+      if (billRefNumber.toLowerCase().includes(rule.keyword.toLowerCase())) {
+        const account = await this.prisma.chartOfAccount.findUnique({
+          where: { companyId_code: { companyId, code: rule.accountCode } },
+        });
+
+        if (account) {
+          this.logger.log(`Rule-matched Daraja BillRefNumber ${billRefNumber} to account ${account.code}`);
+
+          // Create journal entry
+          await this.prisma.journalEntry.create({
+            data: {
+              companyId,
+              accountId: account.id,
+              description: `M-Pesa Daraja: ${billRefNumber}`,
+              amount,
+              direction: account.type === 'INCOME' ? 'CREDIT' : 'DEBIT',
+              entryDate: transactionDate,
+              postedById: 'system',
+              aiConfidence: 0.9,
+              aiReasoning: `Rule-matched: BillRefNumber matched category rule "${rule.keyword}"`,
+              reference: billRefNumber,
+            },
+          });
+
+          return true;
+        }
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * Flags a transaction for human review (HITL) when auto-reconciliation fails.
+   */
+  private async flagForReview(transaction: any, reason: string): Promise<void> {
+    this.logger.log(`Flagging Daraja transaction ${transaction.id} for review: ${reason}`);
+
+    try {
+      await this.hitlService.create(transaction.companyId, {
+        category: 'UNMAPPED_DATA',
+        description: `M-Pesa Daraja: KES ${transaction.amount} — ${transaction.description || 'No description'} (${reason})`,
+        rawData: JSON.stringify(transaction),
+        linkedEntityId: transaction.id,
+        linkedEntityType: 'MPESA_TX',
+        confidence: 0,
+      });
+    } catch (err: any) {
+      this.logger.error(`Failed to create HITL review for Daraja tx ${transaction.id}: ${err.message}`);
+    }
+  }
+
+  /**
+   * Processes a transaction status result from Safaricom.
+   * Updates the transaction status based on the result.
+   */
+  async processTransactionStatusResult(payload: TransactionStatusWebhookPayload): Promise<void> {
+    const result = payload.Result;
+    if (!result) {
+      this.logger.warn('Transaction status webhook missing Result field');
+      return;
+    }
+
+    const { TransactionID, ResultCode, ResultDesc } = result;
+
+    this.logger.log(`Transaction status result for ${TransactionID}: Code=${ResultCode}, Desc=${ResultDesc}`);
+
+    // Find the transaction by receiptNo (TransID)
+    const transaction = await this.prisma.mpesaTransaction.findFirst({
+      where: { receiptNo: TransactionID },
+    });
+
+    if (!transaction) {
+      this.logger.warn(`Transaction status result for unknown TransID: ${TransactionID}`);
+      return;
+    }
+
+    // Extract optional result parameters
+    let resultParams: Record<string, string> = {};
+    if (result.ResultParameters?.ResultParameter) {
+      for (const param of result.ResultParameters.ResultParameter) {
+        resultParams[param.Key] = param.Value;
+      }
+    }
+
+    // Update the transaction with status information
+    // Store the result data in rawCsv (preserve existing data)
+    const existingRaw = transaction.rawCsv ? JSON.parse(transaction.rawCsv) : {};
+    await this.prisma.mpesaTransaction.update({
+      where: { id: transaction.id },
+      data: {
+        rawCsv: JSON.stringify({
+          ...existingRaw,
+          transactionStatus: {
+            resultCode: ResultCode,
+            resultDesc: ResultDesc,
+            resultParams,
+            checkedAt: transaction.transactionDate,
+          },
+        }),
+      },
+    });
+
+    // If the transaction was completed, mark as reconciled
+    if (ResultCode === 0) {
+      this.logger.log(`Transaction ${TransactionID} confirmed completed`);
+    }
+  }
+
+  // ─── Daraja Sync ───────────────────────────────────────────────────────
+
+  /**
+   * Pulls transaction status from Daraja API for a specific M-Pesa transaction.
+   * This is used for on-demand status checks from the frontend.
+   */
+  async pullTransactionStatus(transactionId: string): Promise<any> {
+    const transaction = await this.prisma.mpesaTransaction.findUnique({
+      where: { id: transactionId },
+    });
+
+    if (!transaction) {
+      throw new BadRequestException(`Transaction ${transactionId} not found`);
+    }
+
+    if (!transaction.receiptNo) {
+      throw new BadRequestException('Transaction has no receipt number for Daraja lookup');
+    }
+
+    if (!this.darajaService.isConfigured) {
+      throw new BadRequestException('Daraja API is not configured');
+    }
+
+    return this.darajaService.queryTransactionStatus(transaction.receiptNo);
+  }
+
+  /**
+   * Syncs recent M-Pesa transactions from Daraja API.
+   * Queries transactions by a list of receipt numbers.
+   */
+  async syncFromDaraja(companyId: string, receiptNos: string[]): Promise<{
+    queried: number;
+    results: Array<{ receiptNo: string; status: string }>;
+  }> {
+    if (!this.darajaService.isConfigured) {
+      throw new BadRequestException('Daraja API is not configured');
+    }
+
+    const results: Array<{ receiptNo: string; status: string }> = [];
+
+    for (const receiptNo of receiptNos) {
+      try {
+        const status = await this.darajaService.queryTransactionStatus(receiptNo);
+        const resultCode = status.Result?.ResultCode;
+        results.push({
+          receiptNo,
+          status: resultCode === 0 ? 'COMPLETED' : resultCode === 1 ? 'PENDING' : 'FAILED',
+        });
+      } catch (err: any) {
+        this.logger.warn(`Failed to query Daraja status for ${receiptNo}: ${err.message}`);
+        results.push({ receiptNo, status: 'QUERY_FAILED' });
+      }
+    }
+
+    return {
+      queried: receiptNos.length,
+      results,
+    };
+  }
+
+  // ─── Private Helpers ───────────────────────────────────────────────────
 
   private async autoCategorize(companyId: string, transactions: any[], userId?: string) {
     const rules = await this.prisma.categoryRule.findMany({

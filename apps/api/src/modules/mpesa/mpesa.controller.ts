@@ -2,6 +2,7 @@ import { Controller, Post, Get, Patch, Delete, Body, Param, Query, Req, UseGuard
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MpesaService } from './mpesa.service';
 import { PdfParserService } from './pdf-parser.service';
+import { DarajaService } from './daraja.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('mpesa')
@@ -10,6 +11,7 @@ export class MpesaController {
   constructor(
     private readonly mpesaService: MpesaService,
     private readonly pdfParserService: PdfParserService,
+    private readonly darajaService: DarajaService,
   ) {}
 
   @Post('import')
@@ -85,5 +87,42 @@ export class MpesaController {
   @Delete('transactions/all')
   deleteAll(@Req() req: any) {
     return this.mpesaService.deleteAllTransactions(req.user.companyId);
+  }
+
+  // ─── Daraja API Endpoints ───────────────────────────────────────────────
+
+  /**
+   * Query the status of a specific M-Pesa transaction from Daraja API.
+   */
+  @Post('daraja/status/:transactionId')
+  async queryDarajaStatus(
+    @Param('transactionId') transactionId: string,
+  ) {
+    return this.mpesaService.pullTransactionStatus(transactionId);
+  }
+
+  /**
+   * Sync transaction statuses from Daraja API for a batch of receipt numbers.
+   */
+  @Post('daraja/sync')
+  async syncFromDaraja(
+    @Req() req: any,
+    @Body() body: { receiptNos: string[] },
+  ) {
+    if (!body.receiptNos || body.receiptNos.length === 0) {
+      throw new BadRequestException('receiptNos array is required');
+    }
+    return this.mpesaService.syncFromDaraja(req.user.companyId, body.receiptNos);
+  }
+
+  /**
+   * Check if Daraja API is configured.
+   */
+  @Get('daraja/config')
+  checkDarajaConfig() {
+    return {
+      configured: this.darajaService.isConfigured,
+      environment: process.env.MPESA_ENVIRONMENT || 'sandbox',
+    };
   }
 }

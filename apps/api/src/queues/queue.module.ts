@@ -34,6 +34,7 @@ export const AI_QUEUE = 'AI_QUEUE';
 export const ETIMS_QUEUE = 'ETIMS_QUEUE';
 export const ETIMS_RETRY_QUEUE = 'ETIMS_RETRY_QUEUE';
 export const SYNC_QUEUE = 'SYNC_QUEUE';
+export const DARAJA_QUEUE = 'DARAJA_QUEUE';
 export const STATEMENT_UPLOAD_QUEUE = 'STATEMENT_UPLOAD_QUEUE';
 export const STATEMENT_CLASSIFICATION_QUEUE = 'STATEMENT_CLASSIFICATION_QUEUE';
 
@@ -57,6 +58,10 @@ export const STATEMENT_CLASSIFICATION_QUEUE = 'STATEMENT_CLASSIFICATION_QUEUE';
       useFactory: () => createQueue('offline-sync', 5),
     },
     {
+      provide: DARAJA_QUEUE,
+      useFactory: () => createQueue('daraja-api', 5),
+    },
+    {
       provide: STATEMENT_UPLOAD_QUEUE,
       useFactory: () => createQueue('statement-upload', 3),
     },
@@ -70,6 +75,7 @@ export const STATEMENT_CLASSIFICATION_QUEUE = 'STATEMENT_CLASSIFICATION_QUEUE';
     ETIMS_QUEUE,
     ETIMS_RETRY_QUEUE,
     SYNC_QUEUE,
+    DARAJA_QUEUE,
     STATEMENT_UPLOAD_QUEUE,
     STATEMENT_CLASSIFICATION_QUEUE,
   ],
