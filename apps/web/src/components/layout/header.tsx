@@ -120,13 +120,38 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             aria-expanded={showNotifications}
             aria-haspopup="true"
           >
-            <span className="text-xl">🔔</span>
+            <span className="text-xl" aria-hidden="true">🔔</span>
             {unreadCount > 0 && (
               <span className="absolute top-2 right-2 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-kenya-red px-1 text-xs font-bold text-white">
                 {unreadCount}
               </span>
             )}
           </button>
+
+          {showNotifications && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute right-0 top-full mt-2 z-50 w-80 rounded-xl border border-kenya-green-100 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden"
+            >
+              <div className="px-4 py-3 border-b border-kenya-green-100 dark:border-kenya-green-800">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notifications</p>
+              </div>
+              <div className="py-2 max-h-64 overflow-y-auto">
+                {gamification?.recentActivity && gamification.recentActivity.length > 0 ? (
+                  gamification.recentActivity.slice(0, 5).map((activity, i) => (
+                    <div key={i} className="flex items-center gap-3 px-4 py-2.5 text-sm text-kenya-green-900 dark:text-kenya-green-50 hover:bg-kenya-green-50 dark:hover:bg-kenya-green-900/30">
+                      <span className="text-xs font-medium text-kenya-amber-600 shrink-0">+{activity.points} XP</span>
+                      <span className="text-xs text-gray-600 dark:text-gray-400">{activity.reason}</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="px-4 py-6 text-center text-sm text-gray-400">
+                    No notifications yet
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Company Switcher */}
