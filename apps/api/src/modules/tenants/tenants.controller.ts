@@ -23,6 +23,14 @@ export class TenantsController {
     );
   }
 
+  // ── Static routes MUST come BEFORE parameterized routes ────────────────
+  // Otherwise Express matches 'firm' as an :id parameter.
+
+  @Get('firm/dashboard')
+  getFirmDashboard(@Req() req: any) {
+    return this.tenantsService.getFirmDashboard(req.user.userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.tenantsService.findOne(id);
@@ -65,10 +73,5 @@ export class TenantsController {
   @Delete(':companyId/members/:userId')
   removeMember(@Param('companyId') companyId: string, @Param('userId') userId: string) {
     return this.tenantsService.removeMember(companyId, userId);
-  }
-
-  @Get('firm/dashboard')
-  getFirmDashboard(@Req() req: any) {
-    return this.tenantsService.getFirmDashboard(req.user.userId);
   }
 }
