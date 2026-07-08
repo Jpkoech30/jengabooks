@@ -81,6 +81,8 @@ export function Header() {
             onClick={(e) => { e.stopPropagation(); setShowNotifications(!showNotifications); setShowCompanySwitcher(false); }}
             className="touch-target relative flex h-12 w-12 items-center justify-center rounded-lg text-gray-500 hover:bg-kenya-green-50 dark:hover:bg-kenya-green-900"
             aria-label={`Notifications (${unreadCount} unread)`}
+            aria-expanded={showNotifications}
+            aria-haspopup="true"
           >
             <span className="text-xl">🔔</span>
             {unreadCount > 0 && (
@@ -96,6 +98,9 @@ export function Header() {
           <button
             onClick={(e) => { e.stopPropagation(); setShowCompanySwitcher(!showCompanySwitcher); setShowUserMenu(false); }}
             className="touch-target flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-kenya-green-700 hover:bg-kenya-green-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900"
+            aria-label={`Switch company (current: ${user?.companyName || 'None'})`}
+            aria-expanded={showCompanySwitcher}
+            aria-haspopup="true"
           >
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-kenya-amber-500 text-sm font-bold text-black">
               {user?.companyName?.charAt(0) || '?'}
@@ -184,7 +189,9 @@ export function Header() {
           <button
             onClick={(e) => { e.stopPropagation(); setShowUserMenu(!showUserMenu); setShowCompanySwitcher(false); }}
             className="touch-target flex h-12 w-12 items-center justify-center rounded-full bg-kenya-green-100 text-sm font-bold text-kenya-green-700 hover:bg-kenya-green-200 dark:bg-kenya-green-800 dark:text-kenya-green-300"
-            aria-label="User profile"
+            aria-label={`User menu${user?.name ? ` (${user.name})` : ''}`}
+            aria-expanded={showUserMenu}
+            aria-haspopup="true"
             title={user?.email || ''}
           >
             {userInitials}
