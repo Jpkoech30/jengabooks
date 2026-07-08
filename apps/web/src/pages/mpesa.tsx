@@ -13,7 +13,12 @@ interface MpesaTx {
   transactionDate: string;
   description: string;
   amount: number;
+  paidIn: number;
+  withdrawn: number;
   phoneNumber: string | null;
+  customerName: string | null;
+  paybill: string | null;
+  transactionType: string | null;
   isReconciled: boolean;
   mappedAccount?: { id: string; code: string; name: string } | null;
   category?: string | null;
@@ -24,6 +29,20 @@ interface Account {
   code: string;
   name: string;
   type: string;
+}
+
+const TYPE_COLORS: Record<string, string> = {
+  MERCHANT_PAYMENT: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+  MERCHANT_FEE: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+  OTC_BUY_AIRTIME: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+  AIRTIME_COMMISSION: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+  OTHER: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-300',
+};
+
+function TypeBadge({ type }: { type: string | null }) {
+  const color = TYPE_COLORS[type || 'OTHER'] || TYPE_COLORS.OTHER;
+  const label = (type || 'OTHER').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium ${color}`}>{label}</span>;
 }
 
 export function MpesaImport() {
@@ -62,7 +81,6 @@ export function MpesaImport() {
     setResult(null);
     try {
       if (file.type === 'application/pdf' || file.name.endsWith('.pdf')) {
-        // PDF upload — send as multipart/form-data
         const formData = new FormData();
         formData.append('file', file);
         const data = await apiClient.post<{ imported: number; categorized: number; message: string }>('/mpesa/import/pdf', formData, {
@@ -70,7 +88,6 @@ export function MpesaImport() {
         }).then(res => res.data);
         setResult(data);
       } else {
-        // CSV upload — send as JSON
         const text = await file.text();
         const data = await api.post<{ imported: number; categorized: number; message: string }>('/mpesa/import', {
           csvData: text,
@@ -86,7 +103,7 @@ export function MpesaImport() {
     }
   };
 
-  const [deleteConfirm, setDeleteConfirm] = React.useState<{ open: boolean; type: 'single' | 'all'; receiptNo?: string }>({ open: false, type: 'all' });
+  const [deleteConfirm, setDeleteConfirm] = React.useState<{ open: boolean; type: 'single' | 'all'; receiptNo?: string; txId?: string }>({ open: false, type: 'all' });
 
   const handleDeleteTransaction = async (receiptNo: string) => {
     try {
@@ -114,6 +131,12 @@ export function MpesaImport() {
   };
 
   const formatKES = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
+  const shortDesc = (desc: string) => desc.length > 40 ? desc.slice(0, 40) + '…' : desc;
+
+  // Stats
+  const totalPaidIn = transactions.reduce((s, t) => s + (t.paidIn || 0), 0);
+  const totalWithdrawn = transactions.reduce((s, t) => s + (t.withdrawn || 0), 0);
+  const mapped = transactions.filter(t => t.isReconciled).length;
 
   return (
     <div className="flex flex-col gap-6">
@@ -124,16 +147,35 @@ export function MpesaImport() {
         </div>
       </div>
 
+      {/* Summary Stats */}
+      {transactions.length > 0 && (
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="rounded-xl border border-kenya-green-100 p-3 bg-white dark:bg-kenya-surface-dark">
+            <p className="text-xs text-gray-500">Total Transactions</p>
+            <p className="text-lg font-bold text-kenya-green-700">{transactions.length}</p>
+          </div>
+          <div className="rounded-xl border border-kenya-green-100 p-3 bg-white dark:bg-kenya-surface-dark">
+            <p className="text-xs text-gray-500">Total Paid In</p>
+            <p className="text-lg font-bold text-green-600">{formatKES(totalPaidIn)}</p>
+          </div>
+          <div className="rounded-xl border border-kenya-green-100 p-3 bg-white dark:bg-kenya-surface-dark">
+            <p className="text-xs text-gray-500">Total Withdrawn</p>
+            <p className="text-lg font-bold text-red-600">{formatKES(totalWithdrawn)}</p>
+          </div>
+          <div className="rounded-xl border border-kenya-green-100 p-3 bg-white dark:bg-kenya-surface-dark">
+            <p className="text-xs text-gray-500">Mapped / Unmapped</p>
+            <p className="text-lg font-bold text-kenya-green-900">{mapped} / {transactions.length - mapped}</p>
+          </div>
+        </div>
+      )}
+
       {/* Upload Card */}
       <Card>
         <CardHeader>
-          <CardTitle>Upload M-Pesa CSV</CardTitle>
+          <CardTitle>Upload M-Pesa CSV / PDF</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-4">
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              Upload your M-Pesa CSV or PDF bank statement to import transactions
-            </p>
             <FileUpload
               accept=".csv,.txt,.pdf,text/csv,application/pdf"
               onFileSelect={handleFileUpload}
@@ -157,7 +199,7 @@ export function MpesaImport() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between w-full">
-            <CardTitle>Imported Transactions ({transactions.length})</CardTitle>
+            <CardTitle>Transactions ({transactions.length})</CardTitle>
             {transactions.length > 0 && (
               <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm({ open: true, type: 'all' })}>
                 Delete All
@@ -171,57 +213,84 @@ export function MpesaImport() {
           ) : transactions.length === 0 ? (
             <div className="py-12 text-center">
               <p className="text-3xl mb-2">📄</p>
-              <p className="text-gray-500 dark:text-gray-400">No imported transactions yet. Upload a CSV to get started.</p>
+              <p className="text-gray-500 dark:text-gray-400">No imported transactions yet. Upload a CSV/PDF to get started.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-kenya-green-100 dark:border-kenya-green-800">
-                    <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
-                    <th className="text-left py-3 px-3 font-medium text-gray-500">Description</th>
-                    <th className="text-right py-3 px-3 font-medium text-gray-500">Amount</th>
-                    <th className="text-left py-3 px-3 font-medium text-gray-500">Phone</th>
-                    <th className="text-left py-3 px-3 font-medium text-gray-500">Account</th>
-                    <th className="text-center py-3 px-3 font-medium text-gray-500">Status</th>
-                    <th className="w-10 py-3 px-3" />
+                    <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Date</th>
+                    <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Receipt</th>
+                    <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Customer</th>
+                    <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Description</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Paid In</th>
+                    <th className="text-right py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Withdrawn</th>
+                    <th className="text-center py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Type</th>
+                    <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Account</th>
+                    <th className="text-center py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Status</th>
+                    <th className="w-8 py-3 px-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {transactions.map((tx) => (
                     <tr key={tx.id} className="border-b border-kenya-green-50 dark:border-kenya-green-900 last:border-0 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30">
-                      <td className="py-3 px-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">
-                        {new Date(tx.transactionDate).toLocaleDateString()}
+                      <td className="py-2.5 px-2 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">
+                        {new Date(tx.transactionDate).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}
                       </td>
-                      <td className="py-3 px-3 text-kenya-green-900 dark:text-kenya-green-50">{tx.description}</td>
-                      <td className="py-3 px-3 text-right font-mono text-sm font-medium">{formatKES(tx.amount)}</td>
-                      <td className="py-3 px-3 text-gray-600 dark:text-gray-400">{tx.phoneNumber || '-'}</td>
-                      <td className="py-3 px-3">
+                      <td className="py-2.5 px-2 font-mono text-[10px] text-gray-500 dark:text-gray-400 whitespace-nowrap max-w-[80px] truncate" title={tx.receiptNo || ''}>
+                        {tx.receiptNo || '—'}
+                      </td>
+                      <td className="py-2.5 px-2">
+                        <div className="flex flex-col">
+                          {tx.customerName && <span className="text-xs font-medium text-kenya-green-900 dark:text-kenya-green-50 truncate max-w-[120px]" title={tx.customerName}>{tx.customerName}</span>}
+                          {tx.phoneNumber && <span className="text-[10px] text-gray-400">{tx.phoneNumber}</span>}
+                          {!tx.customerName && !tx.phoneNumber && <span className="text-xs text-gray-400">—</span>}
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-2 text-xs text-gray-600 dark:text-gray-400 max-w-[160px]" title={tx.description}>
+                        {shortDesc(tx.description)}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono text-xs font-medium text-green-600 dark:text-green-400 whitespace-nowrap">
+                        {tx.paidIn > 0 ? formatKES(tx.paidIn) : '—'}
+                      </td>
+                      <td className="py-2.5 px-2 text-right font-mono text-xs font-medium text-red-600 dark:text-red-400 whitespace-nowrap">
+                        {tx.withdrawn > 0 ? formatKES(tx.withdrawn) : '—'}
+                      </td>
+                      <td className="py-2.5 px-2 text-center">
+                        <TypeBadge type={tx.transactionType} />
+                      </td>
+                      <td className="py-2.5 px-2">
                         {tx.mappedAccount ? (
                           <Badge variant="success" size="sm">{tx.mappedAccount.code}</Badge>
                         ) : (
                           <select
-                            className="text-xs rounded border border-kenya-green-200 px-2 py-1 dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
+                            className="text-[10px] rounded border border-kenya-green-200 px-1.5 py-1 max-w-[110px] dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
                             onChange={(e) => e.target.value && handleCategorize(tx.id, e.target.value)}
                             defaultValue=""
                           >
                             <option value="" disabled>Categorize...</option>
                             {accounts.map((a) => (
-                              <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                              <option key={a.id} value={a.id}>{a.code}</option>
                             ))}
                           </select>
                         )}
                       </td>
-                      <td className="py-3 px-3 text-center">
-                        <Badge variant={tx.isReconciled ? 'success' : 'warning'} size="sm">
-                          {tx.isReconciled ? 'Mapped' : 'Unmapped'}
-                        </Badge>
+                      <td className="py-2.5 px-2 text-center">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          tx.isReconciled
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                        }`}>
+                          {tx.isReconciled ? '✓ Mapped' : '○ Unmapped'}
+                        </span>
                       </td>
-                      <td className="py-3 px-1">
+                      <td className="py-2.5 px-2">
                         <button
-                          onClick={() => setDeleteConfirm({ open: true, type: 'single', receiptNo: tx.receiptNo || undefined })}
-                          className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                          aria-label="Delete transaction"
+                          onClick={() => setDeleteConfirm({ open: true, type: 'single', receiptNo: tx.receiptNo || undefined, txId: tx.id })}
+                          className="p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                          aria-label="Delete"
+                          title="Delete transaction"
                         >
                           ✕
                         </button>
