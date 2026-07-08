@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Modal } from '../components/ui/modal';
 import { PageShell } from '../components/layout/page-shell';
+import { PageState } from '../components/ui/page-state';
 import { useAuthStore } from '../stores/auth-store';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
@@ -135,14 +136,13 @@ export function Team() {
           <CardTitle>Team Members ({members.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="py-12 text-center"><p className="text-gray-500">Loading team...</p></div>
-          ) : members.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-3xl mb-2" aria-hidden="true">👥</p>
-              <p className="text-gray-500 dark:text-gray-400">No team members yet. Invite someone to collaborate.</p>
-            </div>
-          ) : (
+          <PageState
+            state={loading ? 'loading' : members.length === 0 ? 'empty' : 'ready'}
+            icon="👥"
+            title="No team members yet"
+            description="Invite someone to collaborate."
+            skeletonRows={3}
+          >
             <div className="space-y-3">
               {members.map((member) => (
                 <div key={member.id} className="flex items-center justify-between rounded-xl border border-kenya-green-100 p-4 dark:border-kenya-green-800">
@@ -189,7 +189,7 @@ export function Team() {
                 </div>
               ))}
             </div>
-          )}
+          </PageState>
         </CardContent>
       </Card>
     </PageShell>
