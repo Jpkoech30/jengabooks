@@ -22,6 +22,10 @@ interface PageStateProps {
   description?: string;
   /** Empty state action button */
   action?: { label: string; onClick: () => void };
+  /** "Learn more" help link shown below the CTA */
+  helpLink?: { label: string; href: string };
+  /** Celebratory animation for positive empty states */
+  animation?: 'confetti' | 'none';
   /** Content to render when state is 'ready' */
   children: React.ReactNode;
   className?: string;
@@ -40,6 +44,8 @@ export function PageState({
   title,
   description,
   action,
+  helpLink,
+  animation,
   children,
   className,
 }: PageStateProps) {
@@ -75,6 +81,8 @@ export function PageState({
           title={title || 'No data found'}
           description={description || 'There are no items to display.'}
           action={action}
+          helpLink={helpLink}
+          animation={animation}
         />
       </div>
     );

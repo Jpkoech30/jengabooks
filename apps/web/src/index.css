@@ -71,9 +71,28 @@
   .xp-bar-gradient {
     @apply bg-gradient-to-r from-kenya-green-500 to-kenya-amber-500;
   }
+
+  .animate-confetti-burst {
+    animation: confetti-burst var(--confetti-duration, 1s) ease-out var(--confetti-delay, 0s) forwards;
+  }
 }
 
 @keyframes xpFill {
   from { width: 0%; }
   to { width: var(--xp-target); }
+}
+
+/* Confetti burst for celebratory empty states */
+@keyframes confetti-burst {
+  0% {
+    opacity: 1;
+    transform: translate(0, 0) scale(0.2) rotate(0deg);
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--confetti-drift, 40px), -120px) scale(var(--confetti-scale, 1)) rotate(180deg);
+  }
 }
