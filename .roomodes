@@ -51,7 +51,7 @@
       "roleDefinition": "You are a Frontend Mobile specialist. You build offline-first UIs using Expo 51, React Native, NativeWind for styling, and WatermelonDB for offline storage. You ensure touch targets are accessible and inputs don't zoom on iOS.",
       "groups": [
         "read",
-        ["edit", { "fileRegex": "^(apps/mobile/src/|packages/shared/src/).*", "description": "Mobile frontend source and shared packages" }],
+        ["edit", { "fileRegex": "^(?:[^/]+/)?(apps/mobile/src/|packages/shared/src/).*", "description": "Mobile frontend source and shared packages" }],
         "command",
         "browser"
       ],
@@ -66,7 +66,7 @@
       "roleDefinition": "You are a Backend Logic specialist. You build NestJS 10 modules, services, controllers, BullMQ queues, and DeepSeek AI agent integrations. You use class-validator for DTOs and wrap external calls with retry logic.",
       "groups": [
         "read",
-        ["edit", { "fileRegex": "^(apps/api/src/(?!prisma).*|packages/shared/src/).*", "description": "NestJS source (excluding prisma/) and shared packages" }],
+        ["edit", { "fileRegex": "^(?:[^/]+/)?(apps/api/src/(?!prisma).*|packages/shared/src/).*", "description": "NestJS source (excluding prisma/) and shared packages" }],
         "command",
         "browser"
       ],
@@ -81,7 +81,7 @@
       "roleDefinition": "You are a Database specialist. You own Prisma 5 schema, PostgreSQL 15 migrations, seed scripts, SQL queries, and Row-Level Security policies. You ensure data integrity with proper types, indexes, and constraints.",
       "groups": [
         "read",
-        ["edit", { "fileRegex": "^(apps/api/prisma/|.*\\.sql$).*", "description": "Prisma schema, migrations, and SQL files" }],
+        ["edit", { "fileRegex": "^(?:[^/]+/)?(apps/api/prisma/|.*\\.sql$).*", "description": "Prisma schema, migrations, and SQL files" }],
         "command",
         "browser"
       ],
@@ -96,7 +96,7 @@
       "roleDefinition": "You are a DevOps specialist. You manage Docker containers, WSL infrastructure, GitHub Actions CI/CD pipelines, and cloud deployment. You ensure secrets are never hardcoded and all services have health checks.",
       "groups": [
         "read",
-        ["edit", { "fileRegex": "^(scripts/|docker-compose|Dockerfile|\\.github/|.*deployment.*).*", "description": "Infrastructure, CI/CD, and deployment configs" }],
+        ["edit", { "fileRegex": "^(?:[^/]+/)?(scripts/|docker-compose|Dockerfile|\\.github/|.*deployment.*).*", "description": "Infrastructure, CI/CD, and deployment configs" }],
         "command",
         "browser"
       ],
@@ -111,7 +111,7 @@
       "roleDefinition": "You are the Agency Documentarian. You maintain OpenAPI specs, README files, and client-facing release highlights. You auto-generate documentation when new endpoints or APIs are added. You ensure all public APIs have clear usage examples.",
       "groups": [
         "read",
-        ["edit", { "fileRegex": "^(docs/|README\\.md|.*openapi.*\\.yaml|CHANGELOG\\.md|.*\\.md$).*", "description": "Documentation files and API specs" }],
+        ["edit", { "fileRegex": "^(?:[^/]+/)?(docs/|README\\.md|.*openapi.*\\.yaml|CHANGELOG\\.md|.*\\.md$).*", "description": "Documentation files and API specs" }],
         "command",
         "browser"
       ],
@@ -126,7 +126,7 @@
       "roleDefinition": "You are the QA Automator. You write Playwright or Cypress E2E tests and run regression suites. You never fix source code - you only write and commit test files. If tests fail, you halt and report the failures with detailed diagnostics.",
       "groups": [
         "read",
-        ["edit", { "fileRegex": "^(e2e/|tests/playwright/).*\\.spec\\.[jt]s$", "description": "E2E test files only" }],
+        ["edit", { "fileRegex": "^(?:[^/]+/)?(e2e/|tests/playwright/).*\\.spec\\.[jt]s$", "description": "E2E test files only" }],
         "command",
         "browser"
       ],

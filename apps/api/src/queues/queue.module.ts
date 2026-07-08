@@ -32,6 +32,7 @@ function createQueue(name: string, attempts = 3): Queue | null {
 // Injection tokens for typed access
 export const AI_QUEUE = 'AI_QUEUE';
 export const ETIMS_QUEUE = 'ETIMS_QUEUE';
+export const ETIMS_RETRY_QUEUE = 'ETIMS_RETRY_QUEUE';
 export const SYNC_QUEUE = 'SYNC_QUEUE';
 export const STATEMENT_UPLOAD_QUEUE = 'STATEMENT_UPLOAD_QUEUE';
 export const STATEMENT_CLASSIFICATION_QUEUE = 'STATEMENT_CLASSIFICATION_QUEUE';
@@ -46,6 +47,10 @@ export const STATEMENT_CLASSIFICATION_QUEUE = 'STATEMENT_CLASSIFICATION_QUEUE';
     {
       provide: ETIMS_QUEUE,
       useFactory: () => createQueue('etims-submission', 5),
+    },
+    {
+      provide: ETIMS_RETRY_QUEUE,
+      useFactory: () => createQueue('etims-retry', 5),
     },
     {
       provide: SYNC_QUEUE,
@@ -63,6 +68,7 @@ export const STATEMENT_CLASSIFICATION_QUEUE = 'STATEMENT_CLASSIFICATION_QUEUE';
   exports: [
     AI_QUEUE,
     ETIMS_QUEUE,
+    ETIMS_RETRY_QUEUE,
     SYNC_QUEUE,
     STATEMENT_UPLOAD_QUEUE,
     STATEMENT_CLASSIFICATION_QUEUE,

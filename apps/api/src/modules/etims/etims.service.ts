@@ -1,7 +1,8 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger, Inject } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { GamificationService } from '../gamification/gamification.service';
+import { EtimsRetryWorker } from '../../queues/etims.queue';
 
 @Injectable()
 export class EtimsService {
@@ -13,6 +14,7 @@ export class EtimsService {
     private readonly prisma: PrismaService,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly gamificationService: GamificationService,
+    private readonly retryWorker: EtimsRetryWorker,
   ) {
     this.kraApiUrl = process.env.KRA_API_URL;
     this.kraClientId = process.env.KRA_CLIENT_ID;
@@ -123,7 +125,11 @@ export class EtimsService {
       throw new BadRequestException('Invoice already submitted and accepted by KRA');
     }
 
-    // Build KRA XML payload (simplified placeholder)
+    if (existing && existing.status === 'FAILED_PERMANENT') {
+      throw new BadRequestException('Invoice submission permanently failed — manual intervention required');
+    }
+
+    // Build KRA XML payload
     const xmlPayload = this.buildXmlPayload(invoice);
 
     // Submit via circuit breaker
@@ -150,14 +156,15 @@ export class EtimsService {
           );
           kraResponse = response.data;
           submissionStatus = response.data.status || 'PENDING';
-          serialNumber = response.data.serialNumber || `KRA-${Date.now()}`;
-          this.logger.log(`eTIMS submission successful: ${serialNumber}`);
+          serialNumber = response.data.serialNumber || `KRA-${invoiceId.substring(0, 8)}`;
+          this.logger.log(`eTIMS submission: ${submissionStatus} — ${serialNumber}`);
         } catch (apiError: any) {
-          this.logger.error(`KRA API error: ${apiError.message}`, apiError.stack);
-          // Fall through to create a failed submission record for retry
-          kraResponse = { status: 'FAILED', error: apiError.message, serialNumber: '' };
+          const errorType = apiError.code === 'ECONNABORTED' ? 'TIMEOUT' : 'REJECTION';
+          this.logger.error(`KRA API error (${errorType}): ${apiError.message}`);
+
+          kraResponse = { status: 'FAILED', error: apiError.message, type: errorType, serialNumber: '' };
           submissionStatus = 'FAILED';
-          serialNumber = `FAILED-${Date.now()}`;
+          serialNumber = `FAILED-${invoiceId.substring(0, 8)}`;
         }
       } else {
         // ─── Placeholder Mock (Development) ─────────────────────────────
@@ -167,6 +174,8 @@ export class EtimsService {
         serialNumber = kraResponse.serialNumber;
       }
 
+      // Upsert submission — omit submittedAt to let DB @default(now()) fire (TIME-TRAVEL rule)
+      const retryCount = existing?.retryCount ?? 0;
       return this.prisma.eTIMSSubmission.upsert({
         where: { invoiceId },
         update: {
@@ -174,8 +183,7 @@ export class EtimsService {
           kraResponse: JSON.stringify(kraResponse),
           status: submissionStatus,
           serialNumber,
-          submittedAt: new Date(),
-          retryCount: { increment: existing?.retryCount || 0 },
+          retryCount: submissionStatus === 'FAILED' ? { increment: 1 } : retryCount,
           lastError: submissionStatus === 'FAILED' ? JSON.stringify(kraResponse) : null,
         },
         create: {
@@ -184,19 +192,31 @@ export class EtimsService {
           xmlPayload,
           kraResponse: JSON.stringify(kraResponse),
           status: submissionStatus,
-          submittedAt: new Date(),
         },
       });
     });
 
-    // Award XP for successful submission
-    if (submission.status === 'ACCEPTED' && userId && companyId) {
-      await this.gamificationService.awardXp(
-        userId,
-        companyId,
-        30,
-        'Submitted an eTIMS invoice',
-      ).catch(() => {});
+    // ─── Post-submission actions ────────────────────────────────────────
+
+    if (submission.status === 'ACCEPTED') {
+      // Clear any pending retry/poll jobs for this invoice
+      await this.retryWorker.clearPendingJobs(invoiceId);
+
+      // Award XP
+      if (userId && companyId) {
+        await this.gamificationService.awardXp(
+          userId,
+          companyId,
+          30,
+          'Submitted an eTIMS invoice',
+        ).catch(() => {});
+      }
+    } else if (submission.status === 'FAILED') {
+      // Schedule retry job with BullMQ delay (TIME-TRAVEL: no Date.now())
+      await this.retryWorker.scheduleRetry(invoiceId, companyId, userId, 0);
+    } else if (submission.status === 'PENDING') {
+      // Schedule first poll
+      await this.retryWorker.schedulePoll(invoiceId, companyId, userId, 0);
     }
 
     return submission;
@@ -216,17 +236,17 @@ export class EtimsService {
       throw new BadRequestException('Submission already accepted');
     }
 
-    if (submission.retryCount >= 5) {
-      throw new BadRequestException('Max retry attempts reached (5)');
+    if (submission.status === 'FAILED_PERMANENT') {
+      throw new BadRequestException('Submission permanently failed — manual intervention required');
     }
 
+    // When manually retrying, pass the current retryCount as attempt
     return this.submitToKra(submission.invoiceId, userId, companyId);
   }
 
   // ─── Helpers ───────────────────────────────────────────────────────────
 
   private buildXmlPayload(invoice: any): string {
-    // Simplified XML builder — in production, use a proper XML library
     const items = JSON.parse(invoice.lineItems || '[]');
     const itemXml = items
       .map(

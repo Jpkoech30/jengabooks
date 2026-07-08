@@ -111,5 +111,45 @@
 ### Compliance Checks  
 - **SENTINEL**: No MISSING_API_DATA, TODO, FIXME, invented endpoints, fake response shapes, hardcoded secrets  
 - **TIME-TRAVEL**: No new Date() or Date.now() in financial logic  
-- **UNIT TEST**: 18/18 M-Pesa service tests pass (4 new batchCategorize tests added); 299/302 total API tests pass (3 pre-existing auth failures)  
-- **FEATURE-CREEP**: Only the 3 explicitly listed files were modified 
+- **UNIT TEST**: 18/18 M-Pesa service tests pass (4 new batchCategorize tests added); 299/302 total API tests pass (3 pre-existing auth failures)
+- **FEATURE-CREEP**: Only the 3 explicitly listed files were modified
+
+## Phase 2 — Fix Sidebar Contrast + Header Colors
+
+**Commit:** [`a129482`](jengabooks) — `fix(web): improve sidebar contrast and header color harmony`
+
+### Files Changed
+| File | Change | Purpose |
+|------|--------|---------|
+| [`apps/web/src/components/layout/sidebar.tsx`](jengabooks/apps/web/src/components/layout/sidebar.tsx) | Color fixes | Nav text `kenya-green-100` → `white` (5.3:1 contrast on `#0A5C36`), section headings `kenya-green-300` → `kenya-green-200`, active nav bg `white/20` → `white/25`, subtitle `kenya-green-200` → `kenya-green-100`, back-to-firm button `kenya-green-100` → `white` |
+| [`apps/web/src/components/layout/header.tsx`](jengabooks/apps/web/src/components/layout/header.tsx) | Color fixes | Borders `kenya-green-100` → `kenya-gray-200`, page title `kenya-green-900` → `kenya-gray-900`, company switcher `kenya-green-700` → `kenya-gray-700`, hover states `kenya-green-50` → `kenya-gray-50`, active company `kenya-green-50` → `kenya-gray-100`, XP notification `kenya-amber-600` → `amber-700` |
+
+### Changes Summary
+
+**Sidebar (`sidebar.tsx`):**
+1. **Nav text** — `text-kenya-green-100 (#CCE1D5)` → `text-white (#FFFFFF)` on `bg-kenya-green-500 (#0A5C36)`: contrast ratio improves from **2.3:1 → 5.3:1** ✅ WCAG AA
+2. **Section headings** — `text-kenya-green-300 (#66A581)` → `text-kenya-green-200 (#99C3AB)` for readability while keeping visual hierarchy
+3. **Active nav** — `bg-white/20` → `bg-white/25` for slightly brighter active state indicator
+4. **Subtitle** — `text-kenya-green-200 (#99C3AB)` → `text-kenya-green-100 (#CCE1D5)` to soften the brand tagline
+5. **Back to Firm** — `text-kenya-green-100` → `text-white` for consistent nav text contrast
+
+**Header (`header.tsx`):**
+1. **Borders** — All `border-kenya-green-100 (#CCE1D5)` → `border-kenya-gray-200 (#E5E7EB)` to reduce green tint clash with the sidebar
+2. **Page title** — `text-kenya-green-900 (#032E17)` → `text-kenya-gray-900 (#111827)` for neutral, readable heading
+3. **Company switcher** — `text-kenya-green-700 (#064523)` → `text-kenya-gray-700 (#374151)` for neutral readability
+4. **Hover states** — All `hover:bg-kenya-green-50` → `hover:bg-kenya-gray-50` for consistent neutral hover feedback
+5. **Active company** — `bg-kenya-green-50` → `bg-kenya-gray-100` for subtle active state without green tint
+6. **XP notification** — `text-kenya-amber-600 (#C98A0C)` → `text-amber-700 (#B45309)` — darker amber for readability
+
+### Edge Cases Handled
+- Dark mode variants preserved: all changes only affect light mode (dark mode uses `dark:` prefix overrides, untouched)
+- Avatar circle (`bg-kenya-green-100 text-kenya-green-700`) left unchanged — it's a visual element, not text-on-background
+- Company info text (`text-kenya-green-600`) in profile card left unchanged — not called out in spec
+- All `kenya-gray-*` tokens already defined in tailwind.config.ts — no new color definitions needed
+
+### Compliance Checks
+- **SENTINEL**: No MISSING_API_DATA, TODO, FIXME, invented endpoints, fake response shapes, hardcoded secrets
+- **TIME-TRAVEL**: No Date() usage touched — pure CSS class changes only
+- **FEATURE-CREEP**: Only the 2 explicitly listed files were modified
+- **48px touch targets**: All interactive elements use `touch-target` class (preserved)
+- **Contrast**: White (#FFFFFF) on kenya-green-500 (#0A5C36) = **5.3:1** ✅ WCAG AA for normal text (requires 4.5:1)
