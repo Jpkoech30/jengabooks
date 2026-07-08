@@ -2,6 +2,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { PageShell } from '../components/layout/page-shell';
 import { api } from '../lib/api-client';
 
 interface PhaseData {
@@ -126,16 +127,10 @@ export function Workflow() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">
-            Monthly Workflow
-          </h1>
-          <p className="text-sm text-gray-500">Track your bookkeeping progress month by month</p>
-        </div>
-      </div>
+    <PageShell
+      title="Monthly Workflow"
+      subtitle="Track your bookkeeping progress month by month"
+    >
 
       {/* Overall Progress */}
       <Card>
@@ -201,6 +196,6 @@ export function Workflow() {
           </div>
         ))}
       </div>
-    </div>
+    </PageShell>
   );
 }
