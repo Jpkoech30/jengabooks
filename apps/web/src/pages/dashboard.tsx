@@ -31,17 +31,23 @@ export function Dashboard() {
   const [healthScore, setHealthScore] = React.useState<{ overallScore: number; pillars: Array<{ name: string; score: number; maxScore: number }> } | null>(null);
   const [wizardData, setWizardData] = React.useState<{ percentage: number; completedSteps: number; totalSteps: number; nextStep: { label: string } | null; isComplete: boolean } | null>(null);
   const [badges, setBadges] = React.useState<Array<{ id: string; name: string; icon: string; earned: boolean }>>([]);
+  const [analytics, setAnalytics] = React.useState<{
+    monthly: Array<{ month: string; income: number; expense: number }>;
+    topExpenses: Array<{ code: string; name: string; total: number }>;
+    mpesaSummary: { paidIn30d: number; withdrawn30d: number };
+  } | null>(null);
 
   React.useEffect(() => {
     async function load() {
       try {
-        const [trialBalance, entries, xp, hs, wizard, badgeData] = await Promise.all([
+        const [trialBalance, entries, xp, hs, wizard, badgeData, analyticData] = await Promise.all([
           api.get<any>('/ledger/trial-balance').catch(() => null),
           api.get<any>('/ledger/entries?limit=5').catch(() => null),
           api.get<any>('/gamification/profile').catch(() => null),
           api.get<any>('/health-score').catch(() => null),
           api.get<any>('/wizard/progress').catch(() => null),
           api.get<any>('/gamification/badges').catch(() => null),
+          api.get<any>('/reports/analytics/dashboard').catch(() => null),
         ]);
 
         const newData: DashboardData = {
@@ -63,6 +69,7 @@ export function Dashboard() {
             ...(badgeData.available || []),
           ]);
         }
+        if (analyticData) setAnalytics(analyticData);
       } catch (e) {
         console.error('Failed to load dashboard:', e);
       } finally {
@@ -311,6 +318,72 @@ export function Dashboard() {
                     {badge.icon} {badge.name}
                   </span>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {/* Analytics: Monthly Trend */}
+          {analytics && analytics.monthly.length > 0 && (
+            <div className="rounded-xl border border-kenya-green-100 p-4 lg:col-span-2">
+              <h3 className="text-sm font-semibold mb-3">📈 Monthly Trend</h3>
+              <div className="flex items-end gap-2 h-24">
+                {analytics.monthly.map((m) => {
+                  const maxVal = Math.max(...analytics.monthly.map(x => Math.max(x.income, x.expense)), 1);
+                  const incomeH = (m.income / maxVal) * 80;
+                  const expenseH = (m.expense / maxVal) * 80;
+                  const label = m.month.slice(5); // "YYYY-MM" -> "MM"
+                  return (
+                    <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5">
+                      <div className="w-full flex flex-col items-center justify-end" style={{ height: '80px' }}>
+                        <div className="w-3/4 bg-green-500 rounded-t" style={{ height: `${Math.max(incomeH, 2)}px` }} title={`Income: KES ${m.income?.toLocaleString()}`} />
+                        <div className="w-3/4 bg-red-400 rounded-b" style={{ height: `${Math.max(expenseH, 2)}px` }} title={`Expenses: KES ${m.expense?.toLocaleString()}`} />
+                      </div>
+                      <span className="text-[10px] text-gray-400">{label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="flex gap-4 mt-2 text-[10px] text-gray-500">
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-green-500" /> Income</span>
+                <span className="flex items-center gap-1"><span className="w-2 h-2 rounded bg-red-400" /> Expenses</span>
+              </div>
+            </div>
+          )}
+
+          {/* Analytics: Top Expenses */}
+          {analytics && analytics.topExpenses.length > 0 && (
+            <div className="rounded-xl border border-kenya-green-100 p-4">
+              <h3 className="text-sm font-semibold mb-2">🔥 Top Expenses</h3>
+              <div className="flex flex-col gap-1.5">
+                {analytics.topExpenses.map((e, i) => (
+                  <div key={e.code || i} className="flex items-center justify-between text-xs">
+                    <span className="text-gray-700 dark:text-gray-300 truncate max-w-[140px]">{e.name || e.code}</span>
+                    <span className="font-mono font-medium text-red-600">KES {e.total?.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Analytics: M-Pesa Summary */}
+          {analytics && (analytics.mpesaSummary.paidIn30d > 0 || analytics.mpesaSummary.withdrawn30d > 0) && (
+            <div className="rounded-xl border border-kenya-green-100 p-4">
+              <h3 className="text-sm font-semibold mb-2">📱 M-Pesa (30d)</h3>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-green-600 font-medium">💰 Paid In</span>
+                  <span className="font-mono text-green-600">KES {analytics.mpesaSummary.paidIn30d?.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-red-600 font-medium">💸 Withdrawn</span>
+                  <span className="font-mono text-red-600">KES {analytics.mpesaSummary.withdrawn30d?.toLocaleString()}</span>
+                </div>
+                <div className="border-t border-gray-100 pt-2 flex items-center justify-between text-xs font-semibold">
+                  <span>Net</span>
+                  <span className={`font-mono ${analytics.mpesaSummary.paidIn30d - analytics.mpesaSummary.withdrawn30d >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    KES {(analytics.mpesaSummary.paidIn30d - analytics.mpesaSummary.withdrawn30d)?.toLocaleString()}
+                  </span>
+                </div>
               </div>
             </div>
           )}
