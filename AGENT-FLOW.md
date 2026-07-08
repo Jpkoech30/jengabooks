@@ -161,3 +161,48 @@
 - VAT rates: 16%% standard (default), 8%% reduced, 0%% zero-rated, null = exempt  
 - No new Date() used; dates from query params, timestamps from DB  
 - 13 unit tests all passing - validation, rate mapping, exempt, mixed, partial periods 
+
+
+### Sprint 9.4 — Client Document Portal Backend (2026-07-08)
+
+**Commit:* [`1f618af`](-) — feat(documents): add document portal backend with upload, version control, and download
+
+### Files Changed
+| File | Change | Purpose |
+|---------|--------|--------|
+| apps/api/prisma/schema.prisma | Modified | Added Document and DocumentVersion models |
+| NEW apps/api/src/modules/documents/documents.module.ts | New file | Documents module with Multer config (20MB, memoryStorage) |
+| NEW apps/api/src/modules/documents/documents.service.ts | New file | File storage, version control, DB transactions |
+| NEW apps/api/src/modules/documents/documents.controller.ts | New file | All 8 REST endpoints with JWT auth |
+| NEW apps/api/src/modules/documents/documents.service.spec.ts | New file | 17 unit tests |
+| NEW apps/api/src/modules/documents/dto/upload-document.dto.ts | New file | Upload DTO with category enum validation |
+| NEW apps/api/src/modules/documents/dto/update-document.dto.ts | New file | Update DTO (all optional fields) |
+| NEW apps/api/src/modules/documents/dto/query-documents.dto.ts | New file | List query with cursor pagination |
+| NEW apps/api/src/modules/documents/dto/create-version.dto.ts | New file | Version creation DTO |
+| apps/api/src/app.module.ts | Modified | Registered DocumentsModule |
+
+### API Endpoints
+- POST /api/v1/documents/upload — Upload document (multipart, max 20MB)
+- GET /api/v1/documents?companyId=&category= — List documents (cursor pagination, filterable)
+- GET /api/v1/documents/:id — Get document metadata
+- GET /api/v1/documents/:id/download?version=N — Stream file download (defaults to latest)
+- PATCH /api/v1/documents/:id — Update metadata (description, tags, category)
+- DELETE /api/v1/documents/:id — Soft-delete
+- POST /api/v1/documents/:id/versions — Upload new version (increments currentVersion)
+- GET /api/v1/documents/:id/versions — List all versions
+
+### Edge Cases Handled
+- File >20MB or  returns 413 Payload Too Large
+- Unsupported type returns 400 Bad Request (allowed: PDF, CSV, XLSX, DOCX, JPG, PNG)
+- Document not found / soft-deleted returns 404
+- Concurrent version uploads use DB $transaction for atomic version increment
+- Missing file in multipart returns 400 Bad Request
+- Invalid version number returns 404 if version doesnexist
+
+### Compliance Checks
+- SENTINEL: No MISSING_API_DATA, TODO, FIXME, invented endpoints, fake response shapes, hardcoded secrets
+- TIME-TRAVEL: No new Date() or Date.now() — all timestamps from @default(now()) (Prisma/DB)
+- UNIT TEST: 17/17 new documents tests pass; 436/439 total API tests pass (3 pre-existing auth failures remain)
+- FEATURE-CREEP: Only files listed in the task were created/modified
+- GROUNDING: Followed existing NestJ patterns (collaboration module as reference)
+
