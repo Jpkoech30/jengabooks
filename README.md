@@ -343,16 +343,24 @@ jengabooks/
 
 ## 🚀 Quick Start
 
-### Prerequisites
+Choose your environment below.
 
-| Tool | Version | Required for |
-|------|---------|-------------|
-| Node.js | >= 20.0.0 | Runtime |
-| npm | 11.x | Package management |
-| PostgreSQL | 15+ | Database |
-| Redis | 7+ | Queues & caching |
+---
 
-### 🏁 One-time Setup
+### 🐧 Option A: Linux Native (PostgreSQL + Redis on host)
+
+Best for: Linux workstations, CI/CD runners, production servers.
+
+#### Prerequisites
+
+| Tool | Version | Check |
+|------|---------|-------|
+| Node.js | >= 20.0.0 | `node --version` |
+| npm | 11.x | `npm --version` |
+| PostgreSQL | 15+ | `psql --version` |
+| Redis | 7+ | `redis-cli --version` |
+
+#### Setup
 
 ```bash
 # 1. Clone & install
@@ -362,7 +370,51 @@ npm install
 
 # 2. Configure environment
 cp .env.example apps/api/.env
-# Edit apps/api/.env with your database credentials
+
+# 3. Create the database
+sudo -u postgres psql -c "CREATE DATABASE jengabooks;"
+
+# 4. Run database migrations
+cd apps/api && npx prisma migrate dev
+
+# 5. Seed demo data
+npx ts-node prisma/seed.ts
+
+# 6. Start development (from root)
+cd ../.. && npm run dev
+```
+
+**Connection config** (`.env` / `apps/api/.env`):
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/jengabooks?schema=public"
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+---
+
+### 🐳 Option B: Windows + Docker (PostgreSQL + Redis in containers)
+
+Best for: Windows workstations with Docker Desktop.
+
+#### Prerequisites
+
+| Tool | Version | Check |
+|------|---------|-------|
+| Node.js | >= 20.0.0 | `node --version` |
+| npm | 11.x | `npm --version` |
+| Docker Desktop | Latest | `docker --version` |
+
+#### Setup
+
+```bash
+# 1. Clone & install
+git clone https://github.com/Jpkoech30/jengabooks.git
+cd jengabooks
+npm install
+
+# 2. Configure environment
+cp .env.example apps/api/.env
 
 # 3. Start infrastructure (Docker)
 docker-compose up -d
@@ -374,28 +426,132 @@ cd apps/api && npx prisma migrate dev
 npx ts-node prisma/seed.ts
 
 # 6. Start development (from root)
+cd ../.. && npm run dev
+```
+
+**Connection config** (`.env` / `apps/api/.env`):
+```env
+DATABASE_URL="postgresql://postgres:postgres@localhost:5432/jengabooks?schema=public"
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+> Docker Desktop on Windows maps container ports to `localhost` by default — no special config needed.
+
+---
+
+### 🪟 Option C: Windows + WSL (PostgreSQL + Redis inside WSL)
+
+Best for: Windows workstations running services natively in WSL without Docker.
+
+#### Prerequisites
+
+| Tool | Version | Check | Where |
+|------|---------|-------|-------|
+| Node.js | >= 20.0.0 | `node --version` | **Windows** |
+| npm | 11.x | `npm --version` | **Windows** |
+| WSL distro | Ubuntu 24.04+ | `wsl -l -v` | **Windows** |
+| PostgreSQL | 15+ | `psql --version` | **WSL** (inside distro) |
+| Redis | 7+ | `redis-cli --version` | **WSL** (inside distro) |
+
+> ⚠️ **Important:** Node.js runs on **Windows**, while PostgreSQL and Redis run **inside WSL**. This means `localhost` from Node.js on Windows does **not** reliably forward to WSL services. You must use the WSL instance's network IP.
+
+#### Step 1: WSL Infrastructure Setup
+
+```bash
+# Inside WSL — Install PostgreSQL
+sudo apt update
+sudo apt install -y postgresql postgresql-client redis-server
+
+# Start services
+sudo service postgresql start
+sudo service redis-server start
+
+# Configure PostgreSQL for external connections
+sudo sed -i "s/#listen_addresses = 'localhost'/listen_addresses = '*'/" /etc/postgresql/15/main/postgresql.conf
+sudo sed -i "s/127.0.0.1\/32/0.0.0.0\/0/" /etc/postgresql/15/main/pg_hba.conf
+sudo service postgresql restart
+
+# Create the database
+sudo -u postgres psql -c "CREATE DATABASE jengabooks;"
+```
+
+#### Step 2: Find your WSL IP
+
+```powershell
+# From Windows PowerShell
+wsl -- ip addr | findstr "inet "
+# Look for an address like 192.168.1.XXX (not 127.0.0.1 or inet6)
+```
+
+#### Step 3: Configure Connection
+
+```bash
+# On Windows — Clone & install
+git clone https://github.com/Jpkoech30/jengabooks.git
+cd jengabooks
+npm install
+
+# Configure .env with the WSL IP found above
+# Edit .env and apps/api/.env
+```
+
+**Connection config** (`.env` / `apps/api/.env`):
+```env
+# ❌ Will NOT work:
+# DATABASE_URL="postgresql://postgres:postgres@localhost:5432/jengabooks"
+
+# ✅ Use WSL's real IP — disable SSL (local Postgres doesn't need it):
+DATABASE_URL="postgresql://postgres:postgres@192.168.1.180:5432/jengabooks?schema=public&sslmode=disable"
+REDIS_HOST=localhost
+REDIS_PORT=6379
+```
+
+> **Why `localhost` fails:** Windows' WSL2 port forwarding is unreliable on some configurations. The WSL instance gets a virtual IP that is stable within a session but `localhost` does not always forward correctly. Direct IP connection with SSL disabled is the confirmed working configuration.
+
+#### Step 4: Run Migrations & Seed
+
+```bash
+cd apps/api
+npx prisma migrate dev
+npx ts-node prisma/seed.ts
+cd ../..
 npm run dev
 ```
 
-### 🖥️ Without Docker
+#### Step 5: Verify Connection
 
 ```bash
-# 1. Create the database
-psql -U postgres -c "CREATE DATABASE jengabooks;"
+# From the project root — tests both WSL IP and localhost
+node scripts/test-conn2.js
 
-# 2. Configure .env
-# apps/api/.env:
-# DATABASE_URL="postgresql://postgres:yourpassword@localhost:5432/jengabooks"
-# PORT=3001
-# JWT_SECRET=your-secure-secret-here
-
-# 3. Run migrations
-cd apps/api && npx prisma migrate dev
-
-# 4. Seed & start
-npx ts-node prisma/seed.ts
-cd ../.. && npm run dev
+# Expected output:
+# ✓ WSL IP: [{"db":"jengabooks","ver":"PostgreSQL 18.4..."}]
+# ✗ localhost: Can't reach database server at localhost:5432
 ```
+
+#### Using the Dev Launcher (one-command start)
+
+```powershell
+# From PowerShell — starts WSL services, waits for them, then starts the app
+.\scripts\dev.ps1
+```
+
+#### If WSL IP Changes
+
+WSL's IP can change after a reboot. To find the new IP:
+
+```powershell
+wsl -- ip addr | findstr "inet "
+```
+
+Then update `DATABASE_URL` in both:
+- [`jengabooks/.env`](jengabooks/.env)
+- [`jengabooks/apps/api/.env`](jengabooks/apps/api/.env)
+
+---
+
+### 🔐 Demo Credentials
 
 ### 🔐 Demo Credentials
 
