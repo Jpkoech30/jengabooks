@@ -3,6 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { Modal } from '../components/ui/modal';
+import { PageShell } from '../components/layout/page-shell';
 import { XPBar } from '../components/ui/xp-bar';
 import { useCompanyRefresh } from '../hooks/use-company-refresh';
 import { showToast } from '../stores/ui-store';
@@ -175,19 +177,16 @@ export function HitlHub() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">HITL Hub</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Human-In-The-Loop — Review and resolve AI decisions</p>
-        </div>
+    <PageShell
+      title="HITL Hub"
+      subtitle="Human-In-The-Loop — Review and resolve AI decisions"
+      actions={
         <div className="flex items-center gap-3">
           {xpData && <XPBar current={xpData.score} max={xpData.score + xpData.xpToNextLevel} showLevel={false} className="w-48" />}
           <Button variant="secondary" size="sm" onClick={() => setShowCreateModal(true)}>+ Create Review</Button>
         </div>
-      </div>
-
+      }
+    >
       {/* Filter Bar */}
       <div className="flex items-center gap-4 flex-wrap">
         <button
@@ -198,7 +197,7 @@ export function HitlHub() {
               : 'bg-kenya-green-50 text-kenya-green-700 hover:bg-kenya-green-100 dark:bg-kenya-green-900/30 dark:text-kenya-green-300'
           }`}
         >
-          👤 My Tasks
+          <span aria-hidden="true">👤</span> My Tasks
         </button>
         <select
           value={filterCategory}
@@ -255,7 +254,7 @@ export function HitlHub() {
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <Badge variant={priorityBadge(task.category)} size="sm">{task.category.replace(/_/g, ' ')}</Badge>
-                      <span className="text-lg">{categoryIcon[task.category] || '📋'}</span>
+                      <span className="text-lg" aria-hidden="true">{categoryIcon[task.category] || '📋'}</span>
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-3 line-clamp-3">{task.description}</p>
                     {task.linkedEntityType && (
@@ -284,8 +283,8 @@ export function HitlHub() {
                     )}
                     <div className="flex items-center justify-between text-xs text-gray-400 mb-3">
                       <span>{new Date(task.createdAt).toLocaleDateString()}</span>
-                      {task.assignedUser && <span>👤 {task.assignedUser.name}</span>}
-                      {task.resolvedUser && <span>✅ {task.resolvedUser.name}</span>}
+                      {task.assignedUser && <span><span aria-hidden="true">👤</span> {task.assignedUser.name}</span>}
+                      {task.resolvedUser && <span><span aria-hidden="true">✅</span> {task.resolvedUser.name}</span>}
                     </div>
                     <div className="mt-3 flex gap-2">
                       {column.status === 'PENDING' && (
@@ -298,7 +297,7 @@ export function HitlHub() {
                           <Button size="sm" variant="secondary" className="flex-1" onClick={() => openResolveDialog(task)}>
                             Resolve
                           </Button>
-                          <Button size="sm" variant="ghost" className="flex-shrink-0 px-2">⋯</Button>
+                          <Button size="sm" variant="ghost" className="flex-shrink-0 px-2" aria-label="More options">⋯</Button>
                         </>
                       )}
                     </div>
@@ -315,63 +314,70 @@ export function HitlHub() {
         ))}
       </div>
 
-      {/* Create Review Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-lg rounded-2xl border border-kenya-green-100 bg-white p-6 shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-kenya-green-900 dark:text-kenya-green-50">Create Review Item</h2>
-              <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            </div>
-            <form onSubmit={handleCreateReview} className="flex flex-col gap-4">
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Category</label>
-                <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
-                  className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
-                  {CATEGORIES.map((cat) => (
-                    <option key={cat} value={cat}>{categoryIcon[cat]} {cat.replace(/_/g, ' ')}</option>
-                  ))}
-                </select>
-              </div>
-              <Input label="Description" placeholder="Describe the item requiring review" value={newDescription}
-                onChange={(e) => setNewDescription(e.target.value)} required />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Raw Data (optional)</label>
-                <textarea value={newRawData} onChange={(e) => setNewRawData(e.target.value)}
-                  className="touch-target min-h-[80px] rounded-lg border border-kenya-green-200 bg-white px-4 py-3 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
-                  placeholder="Paste CSV, JSON, or other raw data..." />
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Conflict Data (optional)</label>
-                <textarea value={newConflictData} onChange={(e) => setNewConflictData(e.target.value)}
-                  className="touch-target min-h-[80px] rounded-lg border border-kenya-green-200 bg-white px-4 py-3 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
-                  placeholder="Paste conflicting data if applicable..." />
-              </div>
-              <div className="flex gap-3 mt-2">
-                <Button type="button" variant="ghost" size="lg" className="flex-1" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-                <Button type="submit" size="lg" className="flex-1" disabled={creating}>
-                  {creating ? 'Creating...' : 'Add to Queue'}
-                </Button>
-              </div>
-            </form>
+      {/* Create Review Modal — using shared Modal with focus trapping */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create Review Item"
+        size="lg"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button type="button" variant="ghost" size="md" className="flex-1" onClick={() => setShowCreateModal(false)}>Cancel</Button>
+            <Button type="submit" size="md" className="flex-1" disabled={creating} form="create-review-form">
+              {creating ? 'Creating...' : 'Add to Queue'}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form id="create-review-form" onSubmit={handleCreateReview} className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Category</label>
+            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)}
+              className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{categoryIcon[cat]} {cat.replace(/_/g, ' ')}</option>
+              ))}
+            </select>
+          </div>
+          <Input label="Description" placeholder="Describe the item requiring review" value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)} required />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Raw Data (optional)</label>
+            <textarea value={newRawData} onChange={(e) => setNewRawData(e.target.value)}
+              className="touch-target min-h-[80px] rounded-lg border border-kenya-green-200 bg-white px-4 py-3 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
+              placeholder="Paste CSV, JSON, or other raw data..." />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Conflict Data (optional)</label>
+            <textarea value={newConflictData} onChange={(e) => setNewConflictData(e.target.value)}
+              className="touch-target min-h-[80px] rounded-lg border border-kenya-green-200 bg-white px-4 py-3 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
+              placeholder="Paste conflicting data if applicable..." />
+          </div>
+        </form>
+      </Modal>
 
-      {/* Resolution Dialog */}
-      {resolveTask && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-lg rounded-2xl border border-kenya-green-100 bg-white p-6 shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-kenya-green-900 dark:text-kenya-green-50">Resolve Task</h2>
-              <button onClick={() => setResolveTask(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            </div>
-
+      {/* Resolution Dialog — using shared Modal with focus trapping */}
+      <Modal
+        isOpen={resolveTask !== null}
+        onClose={() => setResolveTask(null)}
+        title="Resolve Task"
+        size="lg"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button type="button" variant="ghost" size="md" className="flex-1" onClick={() => setResolveTask(null)}>Cancel</Button>
+            <Button type="button" size="md" className="flex-1" disabled={resolving || (resolutionAction !== 'APPROVE' && !resolutionNotes)} onClick={handleResolve}>
+              {resolving ? 'Resolving...' : `Confirm ${resolutionAction.charAt(0) + resolutionAction.slice(1).toLowerCase()}`}
+            </Button>
+          </div>
+        }
+      >
+        {resolveTask && (
+          <>
             {/* Task Info */}
-            <div className="mb-4 p-3 rounded-lg bg-kenya-green-50 dark:bg-kenya-green-900/30">
+            <div className="p-3 rounded-lg bg-kenya-green-50 dark:bg-kenya-green-900/30">
               <div className="flex items-center gap-2 mb-1">
                 <Badge variant={priorityBadge(resolveTask.category)} size="sm">{resolveTask.category.replace(/_/g, ' ')}</Badge>
-                <span className="text-lg">{categoryIcon[resolveTask.category] || '📋'}</span>
+                <span className="text-lg" aria-hidden="true">{categoryIcon[resolveTask.category] || '📋'}</span>
                 {resolveTask.linkedEntityType && (
                   <span className={`ml-auto text-xs px-2 py-0.5 rounded font-medium ${
                     resolveTask.linkedEntityType === 'MPESA_TX' ? 'bg-green-100 text-green-700' :
@@ -424,7 +430,6 @@ export function HitlHub() {
                               <p><strong>Phone:</strong> {tx.phoneNumber || 'N/A'}</p>
                               <p><strong>Date:</strong> {tx.transactionDate ? new Date(tx.transactionDate).toLocaleDateString() : 'N/A'}</p>
                               <p><strong>Receipt:</strong> {tx.receiptNo || 'N/A'}</p>
-                              {/* Show AI reasoning if available */}
                               {tx.aiReasoning && (
                                 <details className="mt-2 border-t border-gray-200 pt-2">
                                   <summary className="text-kenya-amber-600 font-medium cursor-pointer">🤖 AI Reasoning</summary>
@@ -474,8 +479,9 @@ export function HitlHub() {
                         : 'border-blue-500 bg-blue-50 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
                       : 'border-gray-200 text-gray-500 hover:bg-gray-50 dark:border-gray-700'
                   }`}
+                  type="button"
                 >
-                  <div className="text-lg mb-1">
+                  <div className="text-lg mb-1" aria-hidden="true">
                     {action === 'APPROVE' ? '✅' : action === 'REJECT' ? '❌' : '✏️'}
                   </div>
                   <div>{action.charAt(0) + action.slice(1).toLowerCase()}</div>
@@ -502,20 +508,13 @@ export function HitlHub() {
             </div>
 
             {/* XP Preview */}
-            <div className="mb-4 p-3 rounded-lg bg-kenya-amber-50 dark:bg-kenya-amber-900/20 text-sm">
+            <div className="p-3 rounded-lg bg-kenya-amber-50 dark:bg-kenya-amber-900/20 text-sm">
               <span className="font-medium text-kenya-amber-700 dark:text-kenya-amber-300">🎯 +50 XP</span>
               {' '}will be awarded for resolving this task
             </div>
-
-            <div className="flex gap-3">
-              <Button type="button" variant="ghost" size="lg" className="flex-1" onClick={() => setResolveTask(null)}>Cancel</Button>
-              <Button type="button" size="lg" className="flex-1" disabled={resolving || (resolutionAction !== 'APPROVE' && !resolutionNotes)} onClick={handleResolve}>
-                {resolving ? 'Resolving...' : `Confirm ${resolutionAction.charAt(0) + resolutionAction.slice(1).toLowerCase()}`}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+          </>
+        )}
+      </Modal>
+    </PageShell>
   );
 }
