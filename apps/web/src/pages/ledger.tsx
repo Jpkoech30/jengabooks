@@ -10,7 +10,8 @@ import { Modal } from '../components/ui/modal';
 import { PageShell } from '../components/layout/page-shell';
 import { IncomeForm } from '../components/forms/income-form';
 import { ExpenseForm } from '../components/forms/expense-form';
-import { showToast } from '../stores/ui-store';
+import { showToast, useUiStore } from '../stores/ui-store';
+import { t } from '../lib/plain-english';
 import { useQueryClient } from '@tanstack/react-query';
 import { useJournalEntries } from '../hooks/use-api';
 import { api } from '../lib/api-client';
@@ -59,6 +60,8 @@ function rowBgClass(direction: 'DEBIT' | 'CREDIT'): string {
 // ─── Ledger Page ────────────────────────────────────────────────────────────
 
 export function Ledger() {
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
+
   // ── State ──────────────────────────────────────────────────────────────
   const [search, setSearch] = React.useState('');
   const [dateFrom, setDateFrom] = React.useState('');
@@ -179,8 +182,8 @@ export function Ledger() {
 
   return (
     <PageShell
-      title="General Ledger"
-      subtitle="View and manage all accounting entries"
+      title={t('General Ledger', plainEnglish)}
+      subtitle={plainEnglish ? 'View all your business transactions' : 'View and manage all accounting entries'}
     >
       {/* Income Form Modal */}
       <IncomeForm
@@ -241,7 +244,7 @@ export function Ledger() {
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card>
           <CardContent>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Total Debits</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('Total Debits', plainEnglish)}</p>
             <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
               {formatKES(totalDebit)}
             </p>
@@ -249,7 +252,7 @@ export function Ledger() {
         </Card>
         <Card>
           <CardContent>
-            <p className="text-sm text-gray-500 dark:text-gray-400">Total Credits</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">{t('Total Credits', plainEnglish)}</p>
             <p className="text-xl font-bold text-amber-700 dark:text-amber-400">
               {formatKES(totalCredit)}
             </p>
@@ -370,9 +373,9 @@ export function Ledger() {
                         className="text-right py-3 px-3 font-medium text-gray-500 cursor-pointer hover:text-kenya-green-600 select-none"
                         onClick={() => handleSort('amount')}
                       >
-                        Debit{sortArrow('amount')}
+                        {t('Debit', plainEnglish)}{sortArrow('amount')}
                       </th>
-                      <th className="text-right py-3 px-3 font-medium text-gray-500">Credit</th>
+                      <th className="text-right py-3 px-3 font-medium text-gray-500">{t('Credit', plainEnglish)}</th>
                       <th className="text-center py-3 px-3 font-medium text-gray-500">Confidence</th>
                     </tr>
                   </thead>
@@ -478,13 +481,13 @@ export function Ledger() {
             <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Debit</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t('Debit', plainEnglish)}</p>
                   <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
                     {selectedEntry.direction === 'DEBIT' ? formatKES(selectedEntry.amount) : 'KES 0.00'}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">Credit</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">{t('Credit', plainEnglish)}</p>
                   <p className="text-lg font-bold text-amber-700 dark:text-amber-400">
                     {selectedEntry.direction === 'CREDIT' ? formatKES(selectedEntry.amount) : 'KES 0.00'}
                   </p>
@@ -515,9 +518,9 @@ export function Ledger() {
                 <p className="text-xs text-gray-500 dark:text-gray-400">Direction</p>
                 <p className="text-sm font-medium text-kenya-gray-900 dark:text-kenya-green-50">
                   {selectedEntry.direction === 'DEBIT' ? (
-                    <span className="text-emerald-700">Debit</span>
+                    <span className="text-emerald-700">{t('Debit', plainEnglish)}</span>
                   ) : (
-                    <span className="text-amber-700">Credit</span>
+                    <span className="text-amber-700">{t('Credit', plainEnglish)}</span>
                   )}
                 </p>
               </div>
@@ -625,7 +628,7 @@ export function Ledger() {
               </p>
               <p className="text-xs text-red-600 dark:text-red-400 mt-1">
                 {formatKES(deleteTarget.amount)} ·{' '}
-                {deleteTarget.direction === 'DEBIT' ? 'Debit' : 'Credit'}
+                {deleteTarget.direction === 'DEBIT' ? t('Debit', plainEnglish) : t('Credit', plainEnglish)}
               </p>
             </div>
           )}

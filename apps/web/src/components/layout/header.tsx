@@ -2,8 +2,10 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth-store';
+import { useUiStore } from '../../stores/ui-store';
+import { t } from '../../lib/plain-english';
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../../hooks/use-api';
-import { timeAgo } from '../../lib/utils';
+import { timeAgo, cn } from '../../lib/utils';
 import type { Notification, NotificationType } from '../../lib/types';
 
 interface HeaderProps {
@@ -57,6 +59,8 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const switchCompany = useAuthStore((state) => state.switchCompany);
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
+  const togglePlainEnglish = useUiStore((state) => state.togglePlainEnglish);
 
   // Notifications
   const { data: notifications = [], isLoading: notifLoading } = useNotifications('UNREAD');
@@ -64,7 +68,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const markAllRead = useMarkAllNotificationsRead();
 
   const currentPath = '/' + location.pathname.split('/').filter(Boolean)[0];
-  const pageTitle = PAGE_TITLES[currentPath] || 'Dashboard';
+  const pageTitle = t(PAGE_TITLES[currentPath] || 'Dashboard', plainEnglish);
 
   const memberships = user?.memberships || [];
   const hasMultipleCompanies = memberships.length > 1;
@@ -132,8 +136,24 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </h2>
       </div>
 
-      {/* Right: [company switcher] [notifications] [profile menu] */}
+      {/* Right: [plain english toggle] [company switcher] [notifications] [profile menu] */}
       <div className="flex items-center gap-3">
+        {/* Plain English Toggle Pill */}
+        <button
+          onClick={togglePlainEnglish}
+          className={cn(
+            'touch-target inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all',
+            plainEnglish
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 ring-1 ring-emerald-400/50'
+              : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700'
+          )}
+          aria-label={`Plain English mode: ${plainEnglish ? 'on' : 'off'}`}
+          aria-pressed={plainEnglish}
+          title={`Plain English mode: ${plainEnglish ? 'on' : 'off'}`}
+        >
+          <span aria-hidden="true" className="text-sm leading-none">📖</span>
+          <span>Plain English</span>
+        </button>
         {/* Company Switcher */}
         <div ref={companyRef} className="relative">
           {hasMultipleCompanies ? (

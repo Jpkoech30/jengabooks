@@ -8,6 +8,8 @@ import { EmptyState } from '../components/ui/empty-state';
 import { XPBar } from '../components/ui/xp-bar';
 import { api } from '../lib/api-client';
 import { useAuthStore } from '../stores/auth-store';
+import { useUiStore } from '../stores/ui-store';
+import { t } from '../lib/plain-english';
 import { formatKES } from '../lib/utils';
 
 /* ──────────────────────────────────────────────────────────────────────────────
@@ -132,6 +134,7 @@ function FirmDashboard({
   onViewClient: (client: FirmClient) => void;
   onInvite: () => void;
 }) {
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
   return (
     <div className="flex flex-col gap-6">
       {/* Stats bar */}
@@ -291,6 +294,7 @@ function ClientDashboard({
   isFirmUser: boolean;
 }) {
   const navigate = useNavigate();
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
   const hasTransactions = summary.entries.total > 0;
   const recentEntries = summary.entries.recent?.slice(0, 5) || [];
 
@@ -385,7 +389,7 @@ function ClientDashboard({
               </div>
               <div className="min-w-0">
                 <p className="text-lg font-bold text-green-700">{formatKES(totalIncome)}</p>
-                <p className="text-xs text-gray-500">Income</p>
+                <p className="text-xs text-gray-500">{t('Income', plainEnglish)}</p>
               </div>
             </CardContent>
           </Card>
@@ -398,7 +402,7 @@ function ClientDashboard({
               </div>
               <div className="min-w-0">
                 <p className="text-lg font-bold text-red-600">{formatKES(totalExpenses)}</p>
-                <p className="text-xs text-gray-500">Expenses</p>
+                <p className="text-xs text-gray-500">{t('Expenses', plainEnglish)}</p>
               </div>
             </CardContent>
           </Card>
@@ -411,7 +415,7 @@ function ClientDashboard({
               </div>
               <div className="min-w-0">
                 <p className={`text-lg font-bold ${netProfit >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatKES(Math.abs(netProfit))}</p>
-                <p className="text-xs text-gray-500">{netProfit >= 0 ? 'Net Profit' : 'Net Loss'}</p>
+                <p className="text-xs text-gray-500">{t(netProfit >= 0 ? 'Net Profit' : 'Net Loss', plainEnglish)}</p>
               </div>
             </CardContent>
           </Card>
@@ -453,7 +457,7 @@ function ClientDashboard({
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
-                📋 Month-End Progress
+                📋 {t('Month-End Progress', plainEnglish)}
               </h3>
               <span className="text-xs font-bold text-kenya-green-600">{wizardData.percentage}%</span>
             </div>
@@ -483,7 +487,7 @@ function ClientDashboard({
       {/* ─── RECENT ACTIVITY ───────────────────────────────────────────── */}
       <Card>
         <div className="p-4 border-b border-kenya-green-100 dark:border-kenya-green-800 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">Recent Activity</h3>
+          <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">{t('Recent Activity', plainEnglish)}</h3>
           {hasTransactions && (
             <Button variant="ghost" size="sm" onClick={() => navigate('/ledger')}>
               View All →
@@ -559,6 +563,7 @@ export function Dashboard() {
   const navigate = useNavigate();
   const user = useAuthStore((state) => state.user);
   const switchCompany = useAuthStore((state) => state.switchCompany);
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
   const companyId = user?.companyId;
   const companyName = user?.companyName;
   const userRole = user?.role;
@@ -673,7 +678,7 @@ export function Dashboard() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-kenya-gray-900 dark:text-kenya-green-50">📊 Firm Dashboard</h1>
+              <h1 className="text-2xl font-bold text-kenya-gray-900 dark:text-kenya-green-50">📊 {t('Firm Dashboard', plainEnglish)}</h1>
               {user?.name && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-kenya-green-100 dark:bg-kenya-green-900/30 text-xs font-medium text-kenya-green-700 dark:text-kenya-green-300">
                   {user.name}

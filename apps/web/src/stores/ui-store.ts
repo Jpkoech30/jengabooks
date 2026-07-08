@@ -14,10 +14,12 @@ interface UiState {
   toasts: Toast[];
   darkMode: boolean;
   showGamification: boolean;
+  plainEnglish: boolean;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
   toggleDarkMode: () => void;
   setShowGamification: (show: boolean) => void;
+  togglePlainEnglish: () => void;
 }
 
 const getInitialDarkMode = (): boolean => {
@@ -38,10 +40,17 @@ const applyDarkMode = (dark: boolean) => {
 // Apply on load
 applyDarkMode(getInitialDarkMode());
 
+const getInitialPlainEnglish = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  const stored = localStorage.getItem('jengabooks_plain_english');
+  return stored === 'true';
+};
+
 export const useUiStore = create<UiState>((set) => ({
   toasts: [],
   darkMode: getInitialDarkMode(),
   showGamification: true,
+  plainEnglish: getInitialPlainEnglish(),
 
   addToast: (toast) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
@@ -68,6 +77,14 @@ export const useUiStore = create<UiState>((set) => ({
   setShowGamification: (show) => {
     localStorage.setItem('jengabooks_show_gamification', String(show));
     set({ showGamification: show });
+  },
+
+  togglePlainEnglish: () => {
+    set((state) => {
+      const newValue = !state.plainEnglish;
+      localStorage.setItem('jengabooks_plain_english', String(newValue));
+      return { plainEnglish: newValue };
+    });
   },
 }));
 

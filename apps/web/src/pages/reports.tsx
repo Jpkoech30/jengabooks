@@ -6,7 +6,8 @@ import { Input } from '../components/ui/input';
 import { PageShell } from '../components/layout/page-shell';
 import { Skeleton } from '../components/ui/skeleton';
 import { EmptyState } from '../components/ui/empty-state';
-import { showToast } from '../stores/ui-store';
+import { showToast, useUiStore } from '../stores/ui-store';
+import { t } from '../lib/plain-english';
 import { api } from '../lib/api-client';
 import { formatKES } from '../lib/utils';
 
@@ -112,9 +113,10 @@ const cardGradients: Record<string, string> = {
 };
 
 function MetricBadge({ label, value, gradient, bold }: { label: string; value: number; gradient?: string; bold?: boolean }) {
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
   return (
     <div className={`rounded-lg border p-3 ${gradient ?? ''}`}>
-      <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</p>
+      <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{t(label, plainEnglish)}</p>
       <p className={`text-sm font-mono mt-0.5 ${bold ? 'font-bold text-gray-900 dark:text-white' : 'font-semibold text-gray-800 dark:text-gray-200'}`}>
         {formatKES(value)}
       </p>
@@ -123,6 +125,8 @@ function MetricBadge({ label, value, gradient, bold }: { label: string; value: n
 }
 
 function ReportPreviewCard({ result, template }: { result: any; template: ReportTemplate }) {
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
+
   // Detect if result has no meaningful data
   const hasNoData =
     !result ||
@@ -145,7 +149,7 @@ function ReportPreviewCard({ result, template }: { result: any; template: Report
   if (result.totalIncome !== undefined) {
     return (
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">📊 {template.name}</h4>
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">📊 {t(template.name, plainEnglish)}</h4>
         <div className="grid grid-cols-3 gap-2">
           <MetricBadge label="Revenue" value={result.totalIncome} gradient={cardGradients.revenue} />
           <MetricBadge label="Expenses" value={result.totalExpenses} gradient={cardGradients.expense} />
@@ -159,7 +163,7 @@ function ReportPreviewCard({ result, template }: { result: any; template: Report
   if (result.totalAssets !== undefined) {
     return (
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">⚖️ {template.name}</h4>
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">⚖️ {t(template.name, plainEnglish)}</h4>
         <div className="grid grid-cols-3 gap-2">
           <MetricBadge label="Assets" value={result.totalAssets} gradient={cardGradients.asset} />
           <MetricBadge label="Liabilities" value={result.totalLiabilities} gradient={cardGradients.liability} />
@@ -176,7 +180,7 @@ function ReportPreviewCard({ result, template }: { result: any; template: Report
   if (result.totalDebits !== undefined) {
     return (
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">📋 {template.name}</h4>
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">📋 {t(template.name, plainEnglish)}</h4>
         <div className="grid grid-cols-2 gap-2">
           <MetricBadge label="Total Debits" value={result.totalDebits} gradient={cardGradients.audit} />
           <MetricBadge label="Total Credits" value={result.totalCredits} gradient={cardGradients.audit} />
@@ -192,7 +196,7 @@ function ReportPreviewCard({ result, template }: { result: any; template: Report
   if (result.items && Array.isArray(result.items)) {
     return (
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">🔍 {template.name}</h4>
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">🔍 {t(template.name, plainEnglish)}</h4>
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 p-3">
           <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{result.total || result.items.length} records found</p>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -221,7 +225,7 @@ function ReportPreviewCard({ result, template }: { result: any; template: Report
   if (scalarFields.length > 0) {
     return (
       <div className="space-y-2">
-        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{template.icon} {template.name}</h4>
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{template.icon} {t(template.name, plainEnglish)}</h4>
         <div className="space-y-1">
           {scalarFields.map((key) => (
             <Row key={key} label={key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())} value={result[key]} />
@@ -237,6 +241,7 @@ function ReportPreviewCard({ result, template }: { result: any; template: Report
 export function Reports() {
   const { category } = useParams<{ category?: string }>();
   const navigate = useNavigate();
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
   const [selectedReport, setSelectedReport] = React.useState<string | null>(null);
   const configRef = React.useRef<HTMLDivElement>(null);
   const [dateFrom, setDateFrom] = React.useState('');
@@ -418,7 +423,7 @@ export function Reports() {
               <span className="text-3xl">{r.icon}</span>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-base font-semibold text-kenya-green-900 dark:text-kenya-green-50">{r.name}</h3>
+                  <h3 className="text-base font-semibold text-kenya-green-900 dark:text-kenya-green-50">{t(r.name, plainEnglish)}</h3>
                   {r.popular && (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-kenya-amber-100 text-kenya-amber-700 dark:bg-kenya-amber-900/30 dark:text-kenya-amber-300 font-medium shrink-0">
                       Popular
@@ -445,7 +450,7 @@ export function Reports() {
                 <div className="flex items-center gap-2 mb-4">
                   <span className="text-xl">{selectedTemplate.icon}</span>
                   <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
-                    {selectedTemplate.name}
+                    {t(selectedTemplate.name, plainEnglish)}
                   </h3>
                 </div>
                 <div className="flex flex-col gap-4">
