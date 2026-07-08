@@ -1,4 +1,5 @@
 import React from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -95,14 +96,16 @@ const QUICK_RANGES: Array<{ label: string; start: () => Date; end?: () => Date }
 ];
 
 export function Reports() {
+  const { category } = useParams<{ category?: string }>();
+  const navigate = useNavigate();
   const [selectedReport, setSelectedReport] = React.useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = React.useState<string | null>(null);
   const configRef = React.useRef<HTMLDivElement>(null);
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
   const [generating, setGenerating] = React.useState(false);
   const [lastResult, setLastResult] = React.useState<any>(null);
 
+  const activeCategory = category && hashToKey[category] ? category : null;
   const selectedTemplate = selectedReport ? allReports.find((r) => r.id === selectedReport) : null;
   const activeCat = activeCategory ? categories.find((c) => c.key === activeCategory) : null;
 
@@ -114,22 +117,6 @@ export function Reports() {
       }, 100);
     }
   }, [selectedReport]);
-
-  React.useEffect(() => {
-    const hash = window.location.hash.replace('#', '');
-    if (hashToKey[hash]) setActiveCategory(hash);
-  }, []);
-
-  React.useEffect(() => {
-    const onHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      setActiveCategory(hashToKey[hash] || null);
-      setSelectedReport(null);
-      setLastResult(null);
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
 
   const handleGenerate = async () => {
     if (!selectedReport || !selectedTemplate?.endpoint) return;
@@ -204,9 +191,9 @@ export function Reports() {
       <div className="flex flex-col gap-6">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-2 text-sm">
-          <a href="/reports" className="text-gray-500 hover:text-kenya-green-600 dark:text-gray-400 dark:hover:text-kenya-green-400 transition-colors">
+          <button onClick={() => navigate('/reports')} className="text-gray-500 hover:text-kenya-green-600 dark:text-gray-400 dark:hover:text-kenya-green-400 transition-colors">
             Reports
-          </a>
+          </button>
           <span className="text-gray-300 dark:text-gray-600">/</span>
           <span className="font-medium text-kenya-green-900 dark:text-kenya-green-50">{activeCat.title}</span>
         </nav>
@@ -418,10 +405,10 @@ export function Reports() {
         {categories.map((cat) => {
           const catReadyCount = cat.reports.filter(r => r.endpoint).length;
           return (
-            <a
+            <button
               key={cat.key}
-              href={`/reports#${cat.key}`}
-              className={`touch-target rounded-xl border-2 border-l-4 ${categoryAccent[cat.key] || ''} p-5 hover:shadow-md transition-all group`}
+              onClick={() => navigate(`/reports/${cat.key}`)}
+              className={`touch-target rounded-xl border-2 border-l-4 text-left w-full ${categoryAccent[cat.key] || ''} p-5 hover:shadow-md transition-all group`}
             >
               <div className="flex items-start gap-4">
                 <span className="text-3xl">{cat.icon}</span>
@@ -450,7 +437,7 @@ export function Reports() {
                 </div>
                 <span className="text-gray-300 dark:text-gray-600 group-hover:text-kenya-green-500 transition-colors text-lg self-center">→</span>
               </div>
-            </a>
+            </button>
           );
         })}
       </div>

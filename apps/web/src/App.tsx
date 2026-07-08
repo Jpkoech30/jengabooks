@@ -122,6 +122,7 @@ function App() {
             <Route path="/mpesa" element={<MpesaImport />} />
             <Route path="/hitl" element={<HitlHub />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/reports/:category" element={<Reports />} />
             <Route path="/workflow" element={<Workflow />} />
             <Route path="/team" element={<Team />} />
             <Route path="/settings" element={<Settings />} />

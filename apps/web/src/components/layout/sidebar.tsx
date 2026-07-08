@@ -39,10 +39,10 @@ const sections: NavSection[] = [
   {
     label: 'REPORTS',
     items: [
-      { to: '/reports#financial', label: 'Financial Statements', icon: '📈' },
-      { to: '/reports#tax', label: 'Tax & Compliance', icon: '🧾' },
-      { to: '/reports#accounting', label: 'Accounting', icon: '📋' },
-      { to: '/reports#audit', label: 'Audit & Controls', icon: '🔍' },
+      { to: '/reports/financial', label: 'Financial Statements', icon: '📈' },
+      { to: '/reports/tax', label: 'Tax & Compliance', icon: '🧾' },
+      { to: '/reports/accounting', label: 'Accounting', icon: '📋' },
+      { to: '/reports/audit', label: 'Audit & Controls', icon: '🔍' },
     ],
   },
   {
@@ -93,8 +93,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <ul className="flex flex-col gap-0.5">
               {section.items.map((item) => {
                 const isActive = item.to.startsWith('/reports')
-                  ? location.pathname === '/reports' && location.hash === item.to.split('#')[1]
-                  : item.to === '/'
+                    ? location.pathname.startsWith('/reports') && location.pathname === item.to
+                    : item.to === '/'
                     ? location.pathname === '/'
                     : location.pathname.startsWith(item.to);
 
