@@ -185,7 +185,7 @@ function FirmDashboard({
       {/* Client list */}
       <Card>
         <div className="p-4 border-b border-kenya-green-100 dark:border-kenya-green-800 flex items-center justify-between flex-wrap gap-2">
-          <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">Client Overview</h3>
+          <h3 className="text-sm font-semibold text-kenya-gray-900 dark:text-kenya-green-50">Client Overview</h3>
           <Button size="sm" variant="secondary" onClick={onInvite}>+ Invite Client</Button>
         </div>
         <CardContent className="p-0">
@@ -220,7 +220,7 @@ function FirmDashboard({
                             {client.name.charAt(0).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <p className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50 truncate max-w-[160px]">{client.name}</p>
+                            <p className="text-sm font-medium text-kenya-gray-900 dark:text-kenya-green-50 truncate max-w-[160px]">{client.name}</p>
                           </div>
                         </div>
                       </td>
@@ -380,7 +380,7 @@ function ClientDashboard({
           {/* Income */}
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-50">
                 <span className="text-lg" aria-hidden="true">💰</span>
               </div>
               <div className="min-w-0">
@@ -393,7 +393,7 @@ function ClientDashboard({
           {/* Expenses */}
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-50">
                 <span className="text-lg" aria-hidden="true">💸</span>
               </div>
               <div className="min-w-0">
@@ -406,7 +406,7 @@ function ClientDashboard({
           {/* Net Profit */}
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${netProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'}`}>
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${netProfit >= 0 ? 'bg-blue-50' : 'bg-red-100'}`}>
                 <span className="text-lg" aria-hidden="true">{netProfit >= 0 ? '📈' : '📉'}</span>
               </div>
               <div className="min-w-0">
@@ -419,7 +419,7 @@ function ClientDashboard({
           {/* M-Pesa uncleaned alert */}
           <Card>
             <CardContent className="p-4 flex items-center gap-3">
-              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${mpesaUncleaned > 0 ? 'bg-amber-100' : 'bg-green-100'}`}>
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${mpesaUncleaned > 0 ? 'bg-amber-50' : 'bg-green-100'}`}>
                 <span className="text-lg" aria-hidden="true">{mpesaUncleaned > 0 ? '📱' : '✅'}</span>
               </div>
               <div className="min-w-0">
@@ -673,7 +673,7 @@ export function Dashboard() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">📊 Firm Dashboard</h1>
+              <h1 className="text-2xl font-bold text-kenya-gray-900 dark:text-kenya-green-50">📊 Firm Dashboard</h1>
               {user?.name && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-kenya-green-100 dark:bg-kenya-green-900/30 text-xs font-medium text-kenya-green-700 dark:text-kenya-green-300">
                   {user.name}

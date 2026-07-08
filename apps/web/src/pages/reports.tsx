@@ -31,8 +31,8 @@ interface ReportCategory {
 const categoryAccent: Record<string, string> = {
   financial: 'border-l-kenya-green-500 bg-gradient-to-r from-kenya-green-50/50 to-white dark:from-kenya-green-900/10 dark:to-kenya-surface-dark',
   tax: 'border-l-kenya-amber-500 bg-gradient-to-r from-kenya-amber-50/50 to-white dark:from-kenya-amber-900/10 dark:to-kenya-surface-dark',
-  accounting: 'border-l-blue-500 bg-gradient-to-r from-blue-50/50 to-white dark:from-blue-900/10 dark:to-kenya-surface-dark',
-  audit: 'border-l-kenya-red bg-gradient-to-r from-red-50/50 to-white dark:from-red-900/10 dark:to-kenya-surface-dark',
+  accounting: 'border-l-sky-600 bg-gradient-to-r from-sky-50/50 to-white dark:from-sky-900/10 dark:to-kenya-surface-dark',
+  audit: 'border-l-sky-600 bg-gradient-to-r from-sky-50/50 to-white dark:from-sky-900/10 dark:to-kenya-surface-dark',
 };
 
 const categories: ReportCategory[] = [

@@ -52,8 +52,8 @@ function renderConfidenceBadge(confidence: number | null | undefined) {
 
 function rowBgClass(direction: 'DEBIT' | 'CREDIT'): string {
   return direction === 'DEBIT'
-    ? 'bg-green-50/60 dark:bg-green-900/10'
-    : 'bg-red-50/60 dark:bg-red-900/10';
+    ? 'bg-emerald-50/40 dark:bg-emerald-900/10'
+    : 'bg-red-50/40 dark:bg-red-900/10';
 }
 
 // ─── Ledger Page ────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ export function Ledger() {
         <Card>
           <CardContent>
             <p className="text-sm text-gray-500 dark:text-gray-400">Total Debits</p>
-            <p className="text-xl font-bold text-kenya-green-700 dark:text-kenya-green-300">
+            <p className="text-xl font-bold text-emerald-700 dark:text-emerald-300">
               {formatKES(totalDebit)}
             </p>
           </CardContent>
@@ -250,7 +250,7 @@ export function Ledger() {
         <Card>
           <CardContent>
             <p className="text-sm text-gray-500 dark:text-gray-400">Total Credits</p>
-            <p className="text-xl font-bold text-kenya-amber-600 dark:text-kenya-amber-400">
+            <p className="text-xl font-bold text-amber-700 dark:text-amber-400">
               {formatKES(totalCredit)}
             </p>
           </CardContent>
@@ -258,7 +258,7 @@ export function Ledger() {
         <Card>
           <CardContent>
             <p className="text-sm text-gray-500 dark:text-gray-400">Total Entries</p>
-            <p className="text-xl font-bold text-kenya-green-900 dark:text-kenya-green-50">
+            <p className="text-xl font-bold text-kenya-gray-900 dark:text-kenya-green-50">
               {total}
             </p>
           </CardContent>
@@ -391,7 +391,7 @@ export function Ledger() {
                         <td className="py-3 px-3 text-gray-700 dark:text-gray-300 whitespace-nowrap">
                           {formatDate(entry.entryDate)}
                         </td>
-                        <td className="py-3 px-3 text-kenya-green-900 dark:text-kenya-green-50 font-medium">
+                        <td className="py-3 px-3 text-kenya-gray-900 dark:text-kenya-green-50 font-medium">
                           {entry.description}
                         </td>
                         <td className="py-3 px-3">
@@ -399,10 +399,10 @@ export function Ledger() {
                             {entry.account?.code} {entry.account?.name}
                           </Badge>
                         </td>
-                        <td className="py-3 px-3 text-right font-mono text-sm text-kenya-green-700 dark:text-kenya-green-300">
+                        <td className="py-3 px-3 text-right font-mono text-sm text-emerald-700 dark:text-emerald-300">
                           {entry.direction === 'DEBIT' ? formatKES(entry.amount) : '-'}
                         </td>
-                        <td className="py-3 px-3 text-right font-mono text-sm text-kenya-amber-600 dark:text-kenya-amber-400">
+                        <td className="py-3 px-3 text-right font-mono text-sm text-amber-700 dark:text-amber-400">
                           {entry.direction === 'CREDIT' ? formatKES(entry.amount) : '-'}
                         </td>
                         <td className="py-3 px-3 text-center">
@@ -479,13 +479,13 @@ export function Ledger() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Debit</p>
-                  <p className="text-lg font-bold text-kenya-green-700 dark:text-kenya-green-300">
+                  <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
                     {selectedEntry.direction === 'DEBIT' ? formatKES(selectedEntry.amount) : 'KES 0.00'}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Credit</p>
-                  <p className="text-lg font-bold text-kenya-amber-600 dark:text-kenya-amber-400">
+                  <p className="text-lg font-bold text-amber-700 dark:text-amber-400">
                     {selectedEntry.direction === 'CREDIT' ? formatKES(selectedEntry.amount) : 'KES 0.00'}
                   </p>
                 </div>
@@ -496,7 +496,7 @@ export function Ledger() {
             <div className="space-y-3">
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Posted By</p>
-                <p className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50 flex items-center gap-2">
+                <p className="text-sm font-medium text-kenya-gray-900 dark:text-kenya-green-50 flex items-center gap-2">
                   <User className="h-4 w-4 text-gray-400" />
                   {selectedEntry.postedBy?.name || '-'}
                 </p>
@@ -504,7 +504,7 @@ export function Ledger() {
 
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Account</p>
-                <p className="text-sm text-kenya-green-900 dark:text-kenya-green-50">
+                <p className="text-sm text-kenya-gray-900 dark:text-kenya-green-50">
                   <Badge variant="neutral" size="sm">
                     {selectedEntry.account?.code} {selectedEntry.account?.name}
                   </Badge>
@@ -513,18 +513,18 @@ export function Ledger() {
 
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Direction</p>
-                <p className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">
+                <p className="text-sm font-medium text-kenya-gray-900 dark:text-kenya-green-50">
                   {selectedEntry.direction === 'DEBIT' ? (
-                    <span className="text-kenya-green-600">Debit</span>
+                    <span className="text-emerald-700">Debit</span>
                   ) : (
-                    <span className="text-kenya-amber-600">Credit</span>
+                    <span className="text-amber-700">Credit</span>
                   )}
                 </p>
               </div>
 
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Reference</p>
-                <p className="text-sm text-kenya-green-900 dark:text-kenya-green-50">
+                <p className="text-sm text-kenya-gray-900 dark:text-kenya-green-50">
                   {selectedEntry.reference || '-'}
                 </p>
               </div>
@@ -532,7 +532,7 @@ export function Ledger() {
               {selectedEntry.serialNumber && (
                 <div>
                   <p className="text-xs text-gray-500 dark:text-gray-400">Serial Number</p>
-                  <p className="text-sm text-kenya-green-900 dark:text-kenya-green-50 font-mono">
+                  <p className="text-sm text-kenya-gray-900 dark:text-kenya-green-50 font-mono">
                     {selectedEntry.serialNumber}
                   </p>
                 </div>
@@ -554,14 +554,14 @@ export function Ledger() {
 
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Created</p>
-                <p className="text-sm text-kenya-green-900 dark:text-kenya-green-50">
+                <p className="text-sm text-kenya-gray-900 dark:text-kenya-green-50">
                   {formatDate(selectedEntry.createdAt)}
                 </p>
               </div>
 
               <div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">Reconciled</p>
-                <p className="text-sm text-kenya-green-900 dark:text-kenya-green-50">
+                <p className="text-sm text-kenya-gray-900 dark:text-kenya-green-50">
                   {selectedEntry.isReconciled ? (
                     <span className="text-kenya-green-600">Yes</span>
                   ) : (
