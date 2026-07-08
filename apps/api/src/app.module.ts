@@ -19,6 +19,7 @@ import { HealthScoreModule } from './modules/health-score/health-score.module';
 import { WizardModule } from './modules/wizard/wizard.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { TaxModule } from './modules/tax/tax.module';
+import { PayrollModule } from './modules/payroll/payroll.module';
 
 @Module({
   imports: [
@@ -51,6 +52,7 @@ import { TaxModule } from './modules/tax/tax.module';
     WizardModule,
     DashboardModule,
     TaxModule,
+    PayrollModule,
     StatementsModule,
   ],
   providers: [
