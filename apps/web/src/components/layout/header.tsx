@@ -4,7 +4,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth-store';
 import { useGamificationProfile } from '../../hooks/use-api';
 
-export function Header() {
+interface HeaderProps {
+  onToggleSidebar?: () => void;
+}
+
+export function Header({ onToggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [showNotifications, setShowNotifications] = React.useState(false);
@@ -58,10 +62,11 @@ export function Header() {
       {/* Left: Page title area */}
       <div className="flex items-center gap-4">
         <button
+          onClick={onToggleSidebar}
           className="touch-target flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-kenya-green-50 dark:hover:bg-kenya-green-900 lg:hidden"
-          aria-label="Toggle sidebar"
+          aria-label="Open sidebar menu"
         >
-          ☰
+          <span aria-hidden="true">☰</span>
         </button>
         <div>
           <h2 className="text-lg font-semibold text-kenya-green-900 dark:text-kenya-green-50">

@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/auth-store';
@@ -43,6 +43,8 @@ function App() {
   const toasts = useUiStore((state) => state.toasts);
   const removeToast = useUiStore((state) => state.removeToast);
   const companyId = useAuthStore((state) => state.user?.companyId);
+
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Listen for auth:logout events from the API client interceptor
   // This avoids hard page reloads that cause auth loops
@@ -104,9 +106,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
     <ErrorBoundary>
     <div className="flex h-screen">
-      <Sidebar />
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
-        <Header />
+        <Header onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <SyncStatusBanner />
         <main className="flex-1 overflow-y-auto p-6 scroll-smooth">
           <Routes>

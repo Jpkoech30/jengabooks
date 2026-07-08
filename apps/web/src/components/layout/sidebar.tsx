@@ -55,15 +55,27 @@ const sections: NavSection[] = [
   },
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
 
-  return (
-    <aside className="flex h-full w-64 flex-col bg-kenya-green-500 text-white">
+  const handleNavClick = () => {
+    // Close sidebar on mobile after navigation
+    if (window.innerWidth < 1024) {
+      onClose();
+    }
+  };
+
+  const sidebarContent = (
+    <>
       {/* Brand header */}
       <div className="flex items-center gap-3 px-6 py-6 border-b border-kenya-green-400/30">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/10 text-lg">
-          📚
+          <span aria-hidden="true">📚</span>
         </div>
         <div>
           <h1 className="text-lg font-bold leading-tight">JengaBooks</h1>
@@ -92,6 +104,7 @@ export function Sidebar() {
                       to={item.to}
                       end={item.to === '/'}
                       aria-current={isActive ? 'page' : undefined}
+                      onClick={handleNavClick}
                       className={clsx(
                         'touch-target flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
                         {
@@ -110,6 +123,32 @@ export function Sidebar() {
           </div>
         ))}
       </nav>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      {/* Mobile overlay backdrop */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          onClick={onClose}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Sidebar: fixed on mobile (slide-in), static on desktop */}
+      <aside
+        className={clsx(
+          'flex h-full flex-col bg-kenya-green-500 text-white transition-transform duration-200',
+          // Mobile: fixed overlay, slides in from left
+          'fixed left-0 top-0 z-50 w-64 lg:static lg:z-auto',
+          // Mobile: hidden when closed
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+        )}
+      >
+        {sidebarContent}
+      </aside>
+    </>
   );
 }
