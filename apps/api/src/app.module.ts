@@ -22,6 +22,7 @@ import { TaxModule } from './modules/tax/tax.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { PracticeModule } from './modules/practice/practice.module';
 import { CollaborationModule } from './modules/collaboration/collaboration.module';
+import { DocumentsModule } from './modules/documents/documents.module';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { CollaborationModule } from './modules/collaboration/collaboration.modul
     StatementsModule,
     PracticeModule,
     CollaborationModule,
+    DocumentsModule,
   ],
   providers: [
     {
