@@ -4,28 +4,96 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Toggle } from '../components/ui/toggle';
 import { XPBar } from '../components/ui/xp-bar';
+import { Modal } from '../components/ui/modal';
+import { EmptyState } from '../components/ui/empty-state';
 import { PageShell } from '../components/layout/page-shell';
 import { useAuthStore } from '../stores/auth-store';
 import { useUiStore, showToast } from '../stores/ui-store';
 import { useGamificationProfile } from '../hooks/use-api';
 import { api } from '../lib/api-client';
 
-export function Settings() {
+// ─── Tabs ─────────────────────────────────────────────────────────────────
+type Tab = 'profile' | 'preferences' | 'billing' | 'danger-zone';
+
+const TABS: { key: Tab; label: string; icon: string }[] = [
+  { key: 'profile', label: 'Profile', icon: '👤' },
+  { key: 'preferences', label: 'Preferences', icon: '⚙️' },
+  { key: 'billing', label: 'Billing', icon: '💳' },
+  { key: 'danger-zone', label: 'Danger Zone', icon: '⚠️' },
+];
+
+// ─── Danger Zone: Clear Imported Data Confirmation ───────────────────────
+interface ClearDataModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  isClearing: boolean;
+}
+
+function ClearDataModal({ isOpen, onClose, onConfirm, isClearing }: ClearDataModalProps) {
+  const [typedText, setTypedText] = React.useState('');
+  const expectedText = 'DELETE';
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setTypedText('');
+    }
+  }, [isOpen]);
+
+  const isConfirmed = typedText === expectedText;
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Clear All Imported Data"
+      size="md"
+      footer={
+        <div className="flex w-full gap-3">
+          <Button variant="secondary" size="md" className="flex-1" onClick={onClose} disabled={isClearing}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            size="md"
+            className="flex-1"
+            disabled={!isConfirmed || isClearing}
+            onClick={onConfirm}
+          >
+            {isClearing ? 'Clearing...' : 'Clear All Data'}
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <div className="rounded-lg bg-red-50 p-4 dark:bg-red-900/20">
+          <p className="text-sm font-medium text-red-800 dark:text-red-300">
+            This action cannot be undone. All imported M-Pesa transactions, categorisation data,
+            and reconciled entries will be permanently removed.
+          </p>
+        </div>
+
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          To confirm, type <span className="font-mono font-bold text-red-600 dark:text-red-400">DELETE</span> below:
+        </p>
+
+        <Input
+          label="Type DELETE to confirm"
+          placeholder="DELETE"
+          value={typedText}
+          onChange={(e) => setTypedText(e.target.value)}
+          autoComplete="off"
+        />
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Profile Tab ──────────────────────────────────────────────────────────
+function ProfileTab() {
   const user = useAuthStore((state) => state.user);
-  const login = useAuthStore((state) => state.login);
-  const darkMode = useUiStore((state) => state.darkMode);
-  const toggleDarkMode = useUiStore((state) => state.toggleDarkMode);
-  const showGamification = useUiStore((state) => state.showGamification);
-  const setShowGamification = useUiStore((state) => state.setShowGamification);
-  const { data: gamification } = useGamificationProfile();
   const [companyName, setCompanyName] = React.useState(user?.companyName || '');
   const [saving, setSaving] = React.useState(false);
-
-  const [showCreateCompany, setShowCreateCompany] = React.useState(false);
-  const [newCompanyName, setNewCompanyName] = React.useState('');
-  const [newCompanyTier, setNewCompanyTier] = React.useState('BRONZE');
-  const [newCompanyKraPin, setNewCompanyKraPin] = React.useState('');
-  const [creating, setCreating] = React.useState(false);
 
   const handleUpdateCompany = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,38 +109,12 @@ export function Settings() {
     }
   };
 
-  const handleCreateCompany = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setCreating(true);
-    try {
-      const company = await api.post<{ id: string; name: string; tier: string }>('/companies', {
-        name: newCompanyName,
-        tier: newCompanyTier,
-        kraPin: newCompanyKraPin || undefined,
-      });
-
-      await api.post(`/companies/${company.id}/members`, {
-        userId: user!.id,
-        role: 'SME_OWNER',
-      });
-
-      showToast('success', 'Company created', `${newCompanyName} has been created. Switch to it to start working.`);
-      setShowCreateCompany(false);
-      setNewCompanyName('');
-      setNewCompanyKraPin('');
-      setNewCompanyTier('BRONZE');
-    } catch (err: any) {
-      showToast('error', 'Failed to create company', err?.response?.data?.message || 'Please try again');
-    } finally {
-      setCreating(false);
-    }
-  };
+  const memberships = user?.memberships || [];
+  const hasMultipleCompanies = memberships.length > 1;
 
   return (
-    <PageShell
-      title="Settings"
-      subtitle="Manage your account, preferences, and company settings"
-    >
+    <div className="space-y-6">
+      {/* Company Profile */}
       <Card>
         <CardHeader>
           <CardTitle>Company Profile</CardTitle>
@@ -90,6 +132,16 @@ export function Settings() {
               <p><strong>Company ID:</strong> {user?.companyId || '-'}</p>
               <p><strong>Your Role:</strong> {user?.role?.replace(/_/g, ' ') || '-'}</p>
             </div>
+
+            {/* Company switcher indicator for multi-company users */}
+            {hasMultipleCompanies && (
+              <div className="rounded-lg bg-kenya-green-50 p-3 dark:bg-kenya-green-900/20">
+                <p className="text-xs text-kenya-green-700 dark:text-kenya-green-300">
+                  You have access to {memberships.length} companies. Use the company switcher in the header to switch between them.
+                </p>
+              </div>
+            )}
+
             <div className="flex gap-3 mt-2">
               <Button type="submit" size="lg" disabled={saving}>
                 {saving ? 'Saving...' : 'Save Changes'}
@@ -99,6 +151,7 @@ export function Settings() {
         </CardContent>
       </Card>
 
+      {/* Account Information */}
       <Card>
         <CardHeader>
           <CardTitle>Account Information</CardTitle>
@@ -115,10 +168,24 @@ export function Settings() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
 
+// ─── Preferences Tab ──────────────────────────────────────────────────────
+function PreferencesTab() {
+  const darkMode = useUiStore((state) => state.darkMode);
+  const toggleDarkMode = useUiStore((state) => state.toggleDarkMode);
+  const showGamification = useUiStore((state) => state.showGamification);
+  const setShowGamification = useUiStore((state) => state.setShowGamification);
+  const { data: gamification } = useGamificationProfile();
+
+  return (
+    <div className="space-y-6">
+      {/* Toggles */}
       <Card>
         <CardHeader>
-          <CardTitle>Preferences</CardTitle>
+          <CardTitle>Display Preferences</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col gap-5 max-w-md">
@@ -146,6 +213,7 @@ export function Settings() {
         </CardContent>
       </Card>
 
+      {/* Gamification Progress (only when enabled) */}
       {showGamification && gamification && (
         <Card>
           <CardHeader>
@@ -186,60 +254,169 @@ export function Settings() {
           </CardContent>
         </Card>
       )}
+    </div>
+  );
+}
 
-      <Card>
+// ─── Billing Tab ──────────────────────────────────────────────────────────
+function BillingTab() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Billing & Subscription</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <EmptyState
+          icon="💳"
+          title="Billing information coming soon"
+          description="Subscription management, payment methods, and invoices will be available in a future update."
+          action={{ label: 'Contact Support', onClick: () => window.open('mailto:support@jengabooks.com') }}
+          helpLink={{ label: 'Learn about JengaBooks pricing', href: '#' }}
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
+// ─── Danger Zone Tab ──────────────────────────────────────────────────────
+function DangerZoneTab() {
+  const [showClearModal, setShowClearModal] = React.useState(false);
+  const [isClearing, setIsClearing] = React.useState(false);
+
+  const handleClearData = async () => {
+    setIsClearing(true);
+    try {
+      await api.delete('/mpesa');
+      showToast('success', 'Data cleared', 'All imported M-Pesa data has been permanently removed');
+      setShowClearModal(false);
+    } catch (err: any) {
+      showToast('error', 'Failed to clear data', err?.response?.data?.message || 'Please try again');
+    } finally {
+      setIsClearing(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="border-red-200 dark:border-red-800">
         <CardHeader>
-          <CardTitle>Client Onboarding</CardTitle>
+          <CardTitle className="text-red-700 dark:text-red-400">Danger Zone</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            Create a new company to manage a different set of books. You can switch between companies
-            using the company switcher in the header.
-          </p>
-          {showCreateCompany ? (
-            <form onSubmit={handleCreateCompany} className="flex flex-col gap-4 max-w-md">
-              <Input
-                label="Company Name"
-                placeholder="e.g., Acme Enterprises Ltd"
-                value={newCompanyName}
-                onChange={(e) => setNewCompanyName(e.target.value)}
-                required
-              />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Tier</label>
-                <select
-                  value={newCompanyTier}
-                  onChange={(e) => setNewCompanyTier(e.target.value)}
-                  className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
-                >
-                  <option value="BRONZE">Bronze</option>
-                  <option value="GOLD">Gold</option>
-                  <option value="PLATINUM">Platinum</option>
-                </select>
+          <div className="space-y-6">
+            {/* Clear Imported Data */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-900/10">
+              <div>
+                <p className="text-sm font-semibold text-red-800 dark:text-red-300">Clear All Imported Data</p>
+                <p className="text-xs text-red-600 dark:text-red-400">
+                  Permanently remove all M-Pesa transactions, categorisation, and reconciled entries.
+                </p>
               </div>
-              <Input
-                label="KRA PIN (optional)"
-                placeholder="P051234567A"
-                maxLength={11}
-                value={newCompanyKraPin}
-                onChange={(e) => setNewCompanyKraPin(e.target.value.toUpperCase())}
-              />
-              <div className="flex gap-3 mt-2">
-                <Button type="button" variant="ghost" size="lg" className="flex-1" onClick={() => setShowCreateCompany(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" size="lg" className="flex-1" disabled={creating}>
-                  {creating ? 'Creating...' : 'Create Company'}
-                </Button>
-              </div>
-            </form>
-          ) : (
-            <Button size="lg" onClick={() => setShowCreateCompany(true)}>
-              + Create New Company
-            </Button>
-          )}
+              <Button
+                variant="destructive"
+                size="md"
+                onClick={() => setShowClearModal(true)}
+                className="shrink-0"
+              >
+                Clear Data
+              </Button>
+            </div>
+
+            {/* Danger Zone information */}
+            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-800/50">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                <strong>⚠️ Warning:</strong> Actions in this section are permanent and cannot be undone.
+                Always ensure you have a backup before proceeding with destructive operations.
+              </p>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      <ClearDataModal
+        isOpen={showClearModal}
+        onClose={() => setShowClearModal(false)}
+        onConfirm={handleClearData}
+        isClearing={isClearing}
+      />
+    </>
+  );
+}
+
+// ─── Main Settings Page ───────────────────────────────────────────────────
+export function Settings() {
+  const user = useAuthStore((state) => state.user);
+  const [activeTab, setActiveTab] = React.useState<Tab>('profile');
+
+  const hasCompany = !!user?.companyId;
+  const memberships = user?.memberships || [];
+
+  // ── Edge case: No company ─────────────────────────────────────────────
+  if (!hasCompany) {
+    return (
+      <PageShell
+        title="Settings"
+        subtitle="Manage your account, preferences, and company settings"
+      >
+        <Card>
+          <CardContent>
+            <EmptyState
+              icon="🏢"
+              title="No company selected"
+              description="You are not currently associated with any company. Create a new company or join an existing one to get started."
+              action={{
+                label: 'Create New Company',
+                onClick: () => {
+                  // The company creation flow is in the header company switcher,
+                  // so navigate to header or open a company creation flow.
+                  // For now, show a toast directing users to the header.
+                  showToast('info', 'Create a Company', 'Use the company switcher in the header to create or join a company.');
+                },
+              }}
+              helpLink={{ label: 'Learn about companies in JengaBooks', href: '#' }}
+            />
+          </CardContent>
+        </Card>
+      </PageShell>
+    );
+  }
+
+  return (
+    <PageShell
+      title="Settings"
+      subtitle="Manage your account, preferences, and company settings"
+    >
+      {/* Tabs navigation */}
+      <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+        <nav className="-mb-px flex gap-0 overflow-x-auto" aria-label="Settings tabs" role="tablist">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              role="tab"
+              aria-selected={activeTab === tab.key}
+              aria-controls={`tabpanel-${tab.key}`}
+              id={`tab-${tab.key}`}
+              onClick={() => setActiveTab(tab.key)}
+              className={`touch-target inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-4 py-3 text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'border-kenya-green-500 text-kenya-green-700 dark:border-kenya-green-400 dark:text-kenya-green-300'
+                  : 'border-transparent text-gray-500 hover:border-gray-300 hover:text-gray-700 dark:text-gray-400 dark:hover:border-gray-600 dark:hover:text-gray-200'
+              }`}
+            >
+              <span aria-hidden="true" className="text-base">{tab.icon}</span>
+              <span className="hidden sm:inline">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Tab panels */}
+      <div role="tabpanel" id={`tabpanel-${activeTab}`} aria-labelledby={`tab-${activeTab}`}>
+        {activeTab === 'profile' && <ProfileTab />}
+        {activeTab === 'preferences' && <PreferencesTab />}
+        {activeTab === 'billing' && <BillingTab />}
+        {activeTab === 'danger-zone' && <DangerZoneTab />}
+      </div>
     </PageShell>
   );
 }
