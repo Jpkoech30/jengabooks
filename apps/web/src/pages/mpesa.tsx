@@ -2,6 +2,7 @@ import React from 'react';
 import { useCompanyRefresh } from '../hooks/use-company-refresh';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
+import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { FileUpload } from '../components/ui/file-upload';
 import { Modal } from '../components/ui/modal';
@@ -56,6 +57,7 @@ export function MpesaImport() {
   const [importing, setImporting] = React.useState(false);
   const [result, setResult] = React.useState<{ imported: number; categorized: number; message: string } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [search, setSearch] = React.useState('');
   const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const [totalPages, setTotalPages] = React.useState(1);
@@ -101,10 +103,12 @@ export function MpesaImport() {
     }
   };
 
-  const loadTransactions = async (pageNum: number = 1) => {
+  const loadTransactions = async (pageNum: number = 1, searchTerm?: string) => {
     setLoading(true);
     try {
-      const data = await api.get<{ items: MpesaTx[]; total: number; totalPages?: number; page?: number }>('/mpesa', { page: pageNum, limit: PAGE_LIMIT });
+      const params: Record<string, unknown> = { page: pageNum, limit: PAGE_LIMIT };
+      if (searchTerm) params.search = searchTerm;
+      const data = await api.get<{ items: MpesaTx[]; total: number; totalPages?: number; page?: number }>('/mpesa', params);
       setTransactions(data.items);
       setTotal(data.total);
       setTotalPages(data.totalPages || Math.ceil(data.total / PAGE_LIMIT));
@@ -123,10 +127,10 @@ export function MpesaImport() {
   };
 
   React.useEffect(() => {
-    loadTransactions(page);
+    loadTransactions(page, search || undefined);
     loadAccounts();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [refreshKey, page]);
+  }, [refreshKey, page, search]);
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -252,8 +256,15 @@ export function MpesaImport() {
       {/* Transactions Table */}
       <Card>
         <CardHeader>
-          <div className="flex items-center justify-between w-full">
-            <CardTitle>Transactions ({total})</CardTitle>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3 w-full">
+            <CardTitle className="shrink-0">Transactions ({total})</CardTitle>
+            <div className="flex-1 max-w-sm">
+              <Input
+                placeholder="Search transactions..."
+                value={search}
+                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+              />
+            </div>
             {transactions.length > 0 && (
               <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm({ open: true, type: 'all' })}>
                 Delete All
