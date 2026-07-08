@@ -59,8 +59,47 @@ export function MpesaImport() {
   const [page, setPage] = React.useState(1);
   const [total, setTotal] = React.useState(0);
   const [totalPages, setTotalPages] = React.useState(1);
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set());
+  const [batchAccountId, setBatchAccountId] = React.useState('');
+  const [batching, setBatching] = React.useState(false);
   const PAGE_LIMIT = 25;
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === transactions.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(transactions.map((t) => t.id)));
+    }
+  };
+
+  const handleBatchCategorize = async () => {
+    if (!batchAccountId || selectedIds.size === 0) return;
+    setBatching(true);
+    try {
+      await api.post('/mpesa/transactions/batch-categorize', {
+        ids: Array.from(selectedIds),
+        accountId: batchAccountId,
+      });
+      showToast('success', 'Categorized', `${selectedIds.size} transactions categorized`);
+      setSelectedIds(new Set());
+      setBatchAccountId('');
+      loadTransactions(page);
+    } catch (err: any) {
+      showToast('error', 'Batch categorize failed', err?.response?.data?.message || 'Could not categorize transactions');
+    } finally {
+      setBatching(false);
+    }
+  };
 
   const loadTransactions = async (pageNum: number = 1) => {
     setLoading(true);
@@ -231,9 +270,43 @@ export function MpesaImport() {
             skeletonRows={5}
           >
             <div className="overflow-x-auto">
+              {/* Batch action bar */}
+              {selectedIds.size > 0 && (
+                <div className="flex items-center gap-3 px-4 py-2 bg-kenya-green-50 dark:bg-kenya-green-900/30 border-b border-kenya-green-100 dark:border-kenya-green-800">
+                  <span className="text-xs font-medium text-kenya-green-700 dark:text-kenya-green-300">
+                    {selectedIds.size} selected
+                  </span>
+                  <select
+                    value={batchAccountId}
+                    onChange={(e) => setBatchAccountId(e.target.value)}
+                    className="text-xs rounded border border-kenya-green-200 px-2 py-1.5 dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
+                  >
+                    <option value="">Categorize as...</option>
+                    {accounts.map((a) => (
+                      <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+                    ))}
+                  </select>
+                  <Button size="sm" disabled={!batchAccountId || batching} onClick={handleBatchCategorize}>
+                    {batching ? 'Applying...' : 'Apply'}
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => { setSelectedIds(new Set()); setBatchAccountId(''); }}>
+                    Clear
+                  </Button>
+                </div>
+              )}
+
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-kenya-green-100 dark:border-kenya-green-800">
+                    <th className="w-8 py-3 px-2">
+                      <input
+                        type="checkbox"
+                        checked={transactions.length > 0 && selectedIds.size === transactions.length}
+                        onChange={toggleSelectAll}
+                        className="rounded border-gray-300"
+                        aria-label="Select all transactions"
+                      />
+                    </th>
                     <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Date</th>
                     <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Receipt</th>
                     <th className="text-left py-3 px-2 font-medium text-gray-500 text-[11px] uppercase">Customer</th>
@@ -249,6 +322,15 @@ export function MpesaImport() {
                 <tbody>
                   {transactions.map((tx) => (
                     <tr key={tx.id} className="border-b border-kenya-green-50 dark:border-kenya-green-900 last:border-0 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30">
+                      <td className="py-2.5 px-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(tx.id)}
+                          onChange={() => toggleSelect(tx.id)}
+                          className="rounded border-gray-300"
+                          aria-label={`Select transaction ${tx.receiptNo || tx.id}`}
+                        />
+                      </td>
                       <td className="py-2.5 px-2 text-gray-600 dark:text-gray-400 whitespace-nowrap text-xs">
                         {new Date(tx.transactionDate).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}
                       </td>
