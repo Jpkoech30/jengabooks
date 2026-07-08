@@ -21,6 +21,7 @@ import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { TaxModule } from './modules/tax/tax.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
 import { PracticeModule } from './modules/practice/practice.module';
+import { CollaborationModule } from './modules/collaboration/collaboration.module';
 
 @Module({
   imports: [
@@ -56,6 +57,7 @@ import { PracticeModule } from './modules/practice/practice.module';
     PayrollModule,
     StatementsModule,
     PracticeModule,
+    CollaborationModule,
   ],
   providers: [
     {
