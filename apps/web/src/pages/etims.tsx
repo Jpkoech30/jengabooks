@@ -4,6 +4,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { PageShell } from '../components/layout/page-shell';
 import { api } from '../lib/api-client';
 
 interface Invoice {
@@ -92,18 +93,16 @@ export function ETIMS() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">eTIMS Integration</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Kenya Revenue Authority tax compliance</p>
-        </div>
+    <PageShell
+      title="eTIMS Integration"
+      subtitle="Kenya Revenue Authority tax compliance"
+      actions={
         <div className="flex items-center gap-2">
           <Badge variant="success" size="md">KRA Connected</Badge>
           <Button variant="secondary" size="sm" onClick={loadInvoices}>Refresh</Button>
         </div>
-      </div>
+      }
+    >
 
       {/* Tabs */}
       <div className="flex gap-2 border-b border-kenya-green-100 dark:border-kenya-green-800">
@@ -217,6 +216,6 @@ export function ETIMS() {
           </Card>
         </div>
       )}
-    </div>
+    </PageShell>
   );
 }
