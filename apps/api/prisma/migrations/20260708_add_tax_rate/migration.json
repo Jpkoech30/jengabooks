@@ -1,0 +1,1 @@
+{`version`: `5.22`, `checksum`: `auto-generated`, `steps`: [{`tag`: `AlterColumn`, `sql`: `ALTER TABLE chart_of_accounts ADD COLUMN IF NOT EXISTS tax_rate DOUBLE PRECISION;`}]}

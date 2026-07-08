@@ -80,6 +80,7 @@ model ChartOfAccount {
   name      String
   type      String
   isActive  Boolean  @default(true)
+  taxRate   Float?            // VAT rate override: 16 (standard), 8 (reduced), 0 (zero-rated), null (exempt)
   parentId  String?
   parent    ChartOfAccount? @relation("AccountHierarchy", fields: [parentId], references: [id])
   children  ChartOfAccount[] @relation("AccountHierarchy")
@@ -416,3 +417,4 @@ model ParsingTemplate {
   @@index([tenantId, institution])
   @@map("parsing_templates")
 }
+
