@@ -9,12 +9,10 @@ import { XPBar } from '../components/ui/xp-bar';
 import { IncomeForm } from '../components/forms/income-form';
 import { ExpenseForm } from '../components/forms/expense-form';
 import { api } from '../lib/api-client';
+import { useAuthStore } from '../stores/auth-store';
 
 interface DashboardData {
   totalEntries: number;
-  totalDebits: number;
-  totalCredits: number;
-  balanced: boolean;
   recentEntries: Array<{ id: string; description: string; amount: number; direction: string; entryDate: string; account: { code: string; name: string }; aiConfidence?: number | null }>;
   xpScore?: { score: number; level: number; xpToNextLevel: number };
 }
@@ -24,6 +22,9 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 export function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const companyId = useAuthStore((state) => state.user?.companyId);
+  const companyName = useAuthStore((state) => state.user?.companyName);
+
   const [data, setData] = React.useState<DashboardData | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [showIncomeForm, setShowIncomeForm] = React.useState(false);
@@ -39,7 +40,12 @@ export function Dashboard() {
     mpesaSummary: { paidIn30d: number; withdrawn30d: number };
   } | null>(null);
 
+  // Re-fetch all data when companyId changes (user switches company)
   React.useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    setLoading(true);
+
     async function load() {
       try {
         const [entries, xp, hs, wizard, badgeData, analyticData] = await Promise.all([
@@ -51,20 +57,18 @@ export function Dashboard() {
           api.get<any>('/reports/analytics/dashboard').catch(() => null),
         ]);
 
+        if (cancelled) return;
+
         const newData: DashboardData = {
           totalEntries: entries?.total || 0,
-          totalDebits: 0,
-          totalCredits: 0,
-          balanced: false,
           recentEntries: entries?.items?.slice(0, 5) || [],
         };
         if (xp) {
           newData.xpScore = { score: xp.score, level: xp.level, xpToNextLevel: xp.xpToNextLevel };
         }
         setData(newData);
-        if (healthScore) setHealthScore(hs);
-        if (wizard) setWizardData(wizard);
         if (hs) setHealthScore(hs);
+        if (wizard) setWizardData(wizard);
         if (badgeData) {
           setBadges([
             ...(badgeData.earned || []).map((b: any) => ({ ...b, earned: true })),
@@ -75,16 +79,28 @@ export function Dashboard() {
       } catch (e) {
         console.error('Failed to load dashboard:', e);
       } finally {
-        setData((prev) => prev || { totalEntries: 0, totalDebits: 0, totalCredits: 0, balanced: false, recentEntries: [] });
-        setLoading(false);
+        if (!cancelled) {
+          setData((prev) => prev || { totalEntries: 0, recentEntries: [] });
+          setLoading(false);
+        }
       }
     }
     load();
-  }, []);
+
+    return () => { cancelled = true; };
+  }, [companyId]); // key: re-fetch when company changes
 
   const handleCreateSuccess = () => {
+    // Close forms and trigger a fresh data load
+    setShowIncomeForm(false);
+    setShowExpenseForm(false);
+    setShowNewEntryMenu(false);
+    // Trigger Effect re-run by using a refresh counter or just re-fetch directly
     queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-    window.location.reload();
+    // Re-fetch dashboard data for current company
+    api.get<any>('/ledger/entries?limit=5').then((entries) => {
+      setData((prev) => prev ? { ...prev, totalEntries: entries?.total || 0, recentEntries: entries?.items?.slice(0, 5) || [] } : prev);
+    }).catch(() => {});
   };
 
   const formatKES = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
@@ -107,7 +123,14 @@ export function Dashboard() {
       {/* ─── HEADER BAR ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Dashboard</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Dashboard</h1>
+            {companyName && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-kenya-amber-100 dark:bg-kenya-amber-900/30 text-xs font-medium text-kenya-amber-700 dark:text-kenya-amber-300">
+                {companyName}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             {hasTransactions
               ? `${data.totalEntries} entries recorded`
