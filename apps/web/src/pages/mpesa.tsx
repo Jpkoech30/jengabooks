@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { FileUpload } from '../components/ui/file-upload';
 import { Modal } from '../components/ui/modal';
+import { PageShell } from '../components/layout/page-shell';
 import { api, apiClient } from '../lib/api-client';
 import { showToast } from '../stores/ui-store';
 
@@ -141,13 +142,10 @@ export function MpesaImport() {
   const mapped = transactions.filter(t => t.isReconciled).length;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">M-Pesa Import</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Import and categorize M-Pesa business transactions</p>
-        </div>
-      </div>
+    <PageShell
+      title="M-Pesa Import"
+      subtitle="Import and categorize M-Pesa business transactions"
+    >
 
       {/* Summary Stats */}
       {transactions.length > 0 && (
@@ -336,6 +334,6 @@ export function MpesaImport() {
           </p>
         </div>
       </Modal>
-    </div>
+    </PageShell>
   );
 }
