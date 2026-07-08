@@ -631,4 +631,352 @@ describe('PayrollService', () => {
       expect(result.brackets.length).toBeGreaterThan(0);
     });
   });
+
+  // ─── Statutory Filing ────────────────────────────────────────────────
+
+  describe('prepareFiling', () => {
+    const periodEnd = new Date('2026-06-30');
+
+    const mockRun = {
+      id: 'run_1',
+      companyId: 'comp_123',
+      status: 'LOCKED',
+      periodStart: new Date('2026-06-01'),
+      periodEnd,
+      totalGrossPay: 500000,
+      totalNetPay: 350000,
+      totalPaye: 100000,
+      totalNhif: 17000,
+      totalNssf: 30000,
+      totalHousingLevy: 7500,
+      totalEmployerCost: 50000,
+      company: {
+        id: 'comp_123',
+        name: 'Acme Enterprises Ltd',
+        kraPin: 'P051234567A',
+      },
+      entries: [
+        {
+          id: 'entry_1',
+          grossPay: 150000,
+          basicPay: 130000,
+          benefitsTotal: 20000,
+          paye: 39500,
+          nhif: 1700,
+          nssf: 2160,
+          housingLevy: 2250,
+          netPay: 104390,
+          employerNhif: 1700,
+          employerNssf: 2160,
+          employerHousing: 2250,
+          status: 'CALCULATED',
+          employee: {
+            id: 'emp_1',
+            name: 'John Kamau',
+            kraPin: 'P123456789X',
+            nhifNumber: 'NHIF001',
+            nssfNumber: 'NSSF001',
+          },
+        },
+        {
+          id: 'entry_2',
+          grossPay: 80000,
+          basicPay: 70000,
+          benefitsTotal: 10000,
+          paye: 18500,
+          nhif: 1100,
+          nssf: 2160,
+          housingLevy: 1200,
+          netPay: 57040,
+          employerNhif: 1100,
+          employerNssf: 2160,
+          employerHousing: 1200,
+          status: 'CALCULATED',
+          employee: {
+            id: 'emp_2',
+            name: 'Jane Wanjiku',
+            kraPin: 'P987654321Y',
+            nhifNumber: 'NHIF002',
+            nssfNumber: 'NSSF002',
+          },
+        },
+      ],
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should throw NotFoundException when run does not exist', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.prepareFiling('nonexistent', 'PAYE'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when run is DRAFT', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        status: 'DRAFT',
+      });
+
+      await expect(
+        service.prepareFiling('run_1', 'PAYE'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ConflictException when run is already FILED', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        status: 'FILED',
+      });
+
+      await expect(
+        service.prepareFiling('run_1', 'PAYE'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should prepare PAYE filing with CSV export', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+
+      const result = await service.prepareFiling('run_1', 'PAYE');
+
+      expect(result.taxYear).toBe('2026');
+      expect(result.period).toBe('June 2026');
+      expect(result.employer.kraPin).toBe('P051234567A');
+      expect(result.employer.name).toBe('Acme Enterprises Ltd');
+      expect(result.summary.totalEmployees).toBe(2);
+      expect(result.summary.totalGrossPay).toBe(500000);
+      expect(result.summary.totalPaye).toBe(100000);
+      expect(result.employeeDetails.length).toBe(2);
+      expect(result.employeeDetails[0].kraPin).toBe('P123456789X');
+      expect(result.employeeDetails[0].name).toBe('John Kamau');
+      expect(result.csvExport).toBeDefined();
+      expect(result.csvExport!).toContain('KRA PIN,Employee Name,Period,Gross Pay,PAYE,Personal Relief,Net PAYE');
+      expect(result.csvExport!).toContain('P123456789X,John Kamau,062026,150000,39500,2400,37100');
+      expect(result.csvExport!).toContain('P987654321Y,Jane Wanjiku,062026,80000,18500,2400,16100');
+    });
+
+    it('should prepare NHIF filing with NHIF CSV', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+
+      const result = await service.prepareFiling('run_1', 'NHIF');
+
+      expect(result.taxYear).toBe('2026');
+      expect(result.nhifCsv).toBeDefined();
+      expect(result.nhifCsv!).toContain('NHIF Number,Employee Name,Period,Gross Pay,NHIF Deduction,Employer NHIF');
+      expect(result.nhifCsv!).toContain('NHIF001,John Kamau,062026,150000,1700,1700');
+    });
+
+    it('should prepare NSSF filing with NSSF CSV', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+
+      const result = await service.prepareFiling('run_1', 'NSSF');
+
+      expect(result.nssfCsv).toBeDefined();
+      expect(result.nssfCsv!).toContain('NSSF Number,Employee Name,Period,Tier I,Tier II,Employee NSSF,Employer NSSF');
+      expect(result.nssfCsv!).toContain('NSSF001');
+    });
+
+    it('should prepare Housing Levy filing with CSV', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+
+      const result = await service.prepareFiling('run_1', 'HOUSING_LEVY');
+
+      expect(result.housingLevyCsv).toBeDefined();
+      expect(result.housingLevyCsv!).toContain('KRA PIN,Employee Name,Period,Gross Pay,Housing Levy,Employer Housing Levy');
+      expect(result.housingLevyCsv!).toContain('P123456789X,John Kamau,062026,150000,2250,2250');
+    });
+
+    it('should return warnings for zero employees', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        totalGrossPay: 0,
+        entries: [],
+      });
+
+      const result = await service.prepareFiling('run_1', 'PAYE');
+
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings!.length).toBeGreaterThan(0);
+      expect(result.warnings![0]).toContain('zero employees');
+      expect(result.summary.totalEmployees).toBe(0);
+    });
+
+    it('should exclude employees missing KRA PIN from PAYE filing with warning', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        entries: [
+          {
+            ...mockRun.entries[0],
+            employee: { ...mockRun.entries[0].employee, kraPin: null },
+          },
+          {
+            ...mockRun.entries[1],
+            employee: { ...mockRun.entries[1].employee, kraPin: 'P987654321Y' },
+          },
+        ],
+      });
+
+      const result = await service.prepareFiling('run_1', 'PAYE');
+
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings![0]).toContain('missing KRA PIN');
+      expect(result.warnings![0]).toContain('John Kamau');
+      expect(result.summary.totalEmployees).toBe(1);
+      expect(result.employeeDetails[0].name).toBe('Jane Wanjiku');
+    });
+
+    it('should exclude employees missing NHIF number from NHIF filing with warning', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        entries: [
+          {
+            ...mockRun.entries[0],
+            employee: { ...mockRun.entries[0].employee, nhifNumber: null },
+          },
+        ],
+      });
+
+      const result = await service.prepareFiling('run_1', 'NHIF');
+
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings![0]).toContain('missing NHIF number');
+      expect(result.summary.totalEmployees).toBe(0);
+    });
+
+    it('should exclude employees missing NSSF number from NSSF filing with warning', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        entries: [
+          {
+            ...mockRun.entries[0],
+            employee: { ...mockRun.entries[0].employee, nssfNumber: null },
+          },
+        ],
+      });
+
+      const result = await service.prepareFiling('run_1', 'NSSF');
+
+      expect(result.warnings).toBeDefined();
+      expect(result.warnings![0]).toContain('missing NSSF number');
+      expect(result.summary.totalEmployees).toBe(0);
+    });
+  });
+
+  describe('submitFiling', () => {
+    const periodEnd = new Date('2026-06-30');
+
+    const mockRun = {
+      id: 'run_1',
+      companyId: 'comp_123',
+      status: 'LOCKED',
+      periodStart: new Date('2026-06-01'),
+      periodEnd,
+      totalGrossPay: 500000,
+      filedAt: null,
+    };
+
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('should throw NotFoundException when run does not exist', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.submitFiling('nonexistent', 'PAYE'),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should throw BadRequestException when run is DRAFT', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        status: 'DRAFT',
+      });
+
+      await expect(
+        service.submitFiling('run_1', 'PAYE'),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw ConflictException when run is already FILED', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue({
+        ...mockRun,
+        status: 'FILED',
+      });
+
+      await expect(
+        service.submitFiling('run_1', 'PAYE'),
+      ).rejects.toThrow(ConflictException);
+    });
+
+    it('should submit PAYE filing successfully and mark run as FILED', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+      mockPrisma.payrollRun.update.mockResolvedValue({
+        ...mockRun,
+        status: 'FILED',
+        filedAt: new Date('2026-07-08T21:00:00.000Z'),
+      });
+
+      const result = await service.submitFiling('run_1', 'PAYE');
+
+      expect(result.submitted).toBe(true);
+      expect(result.submissionRef).toMatch(/^KRA-2026-06-PAYE-/);
+      expect(result.submittedAt).toBeDefined();
+      expect(result.status).toBe('ACCEPTED');
+      expect(mockPrisma.payrollRun.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'run_1' },
+          data: expect.objectContaining({
+            status: 'FILED',
+            filedAt: expect.any(Date),
+          }),
+        }),
+      );
+    });
+
+    it('should submit NHIF filing successfully', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+      mockPrisma.payrollRun.update.mockResolvedValue({
+        ...mockRun,
+        status: 'FILED',
+        filedAt: new Date('2026-07-08T21:00:00.000Z'),
+      });
+
+      const result = await service.submitFiling('run_1', 'NHIF');
+
+      expect(result.submitted).toBe(true);
+      expect(result.submissionRef).toMatch(/^KRA-2026-06-NHIF-/);
+    });
+
+    it('should submit NSSF filing successfully', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+      mockPrisma.payrollRun.update.mockResolvedValue({
+        ...mockRun,
+        status: 'FILED',
+        filedAt: new Date('2026-07-08T21:00:00.000Z'),
+      });
+
+      const result = await service.submitFiling('run_1', 'NSSF');
+
+      expect(result.submitted).toBe(true);
+      expect(result.submissionRef).toMatch(/^KRA-2026-06-NSSF-/);
+    });
+
+    it('should submit Housing Levy filing successfully', async () => {
+      mockPrisma.payrollRun.findUnique.mockResolvedValue(mockRun);
+      mockPrisma.payrollRun.update.mockResolvedValue({
+        ...mockRun,
+        status: 'FILED',
+        filedAt: new Date('2026-07-08T21:00:00.000Z'),
+      });
+
+      const result = await service.submitFiling('run_1', 'HOUSING_LEVY');
+
+      expect(result.submitted).toBe(true);
+      expect(result.submissionRef).toMatch(/^KRA-2026-06-HOUSING_LEVY-/);
+    });
+  });
 });

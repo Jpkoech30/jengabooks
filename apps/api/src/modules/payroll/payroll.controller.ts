@@ -14,6 +14,8 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CalculatePayeDto } from './dto/calculate-paye.dto';
 import { CreatePayrollRunDto } from './dto/create-payroll-run.dto';
 import { PaginatedQueryDto } from './dto/paginated-query.dto';
+import { PrepareFilingDto } from './dto/prepare-filing.dto';
+import { SubmitFilingDto } from './dto/submit-filing.dto';
 
 @Controller('payroll')
 @UseGuards(JwtAuthGuard)
@@ -94,5 +96,29 @@ export class PayrollController {
   @Post('runs/:id/calculate-all')
   calculateAllInRun(@Param('id') id: string) {
     return this.payrollService.calculateAllInRun(id);
+  }
+
+  /**
+   * POST /api/v1/payroll/runs/:id/prepare-filing
+   * Generate filing data (CSV) for a statutory return.
+   */
+  @Post('runs/:id/prepare-filing')
+  prepareFiling(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true })) body: PrepareFilingDto,
+  ) {
+    return this.payrollService.prepareFiling(id, body.type);
+  }
+
+  /**
+   * POST /api/v1/payroll/runs/:id/submit-filing
+   * Submit a statutory filing to KRA (mock).
+   */
+  @Post('runs/:id/submit-filing')
+  submitFiling(
+    @Param('id') id: string,
+    @Body(new ValidationPipe({ transform: true })) body: SubmitFilingDto,
+  ) {
+    return this.payrollService.submitFiling(id, body.type);
   }
 }

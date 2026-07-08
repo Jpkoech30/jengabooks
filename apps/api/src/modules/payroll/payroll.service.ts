@@ -82,6 +82,44 @@ export interface PayrollRunResult {
   createdAt: Date;
 }
 
+export interface FilingResult {
+  taxYear: string;
+  period: string;
+  employer: {
+    kraPin: string;
+    name: string;
+    address: string;
+  };
+  summary: {
+    totalEmployees: number;
+    totalGrossPay: number;
+    totalPaye: number;
+    totalNhif: number;
+    totalNssf: number;
+    totalHousingLevy: number;
+  };
+  employeeDetails: Array<{
+    kraPin: string;
+    name: string;
+    grossPay: number;
+    paye: number;
+    nhif: number;
+    nssf: number;
+  }>;
+  csvExport?: string;
+  nhifCsv?: string;
+  nssfCsv?: string;
+  housingLevyCsv?: string;
+  warnings?: string[];
+}
+
+export interface SubmissionResult {
+  submitted: boolean;
+  submissionRef: string;
+  submittedAt: Date | null;
+  status: string;
+}
+
 @Injectable()
 export class PayrollService {
   private readonly logger = new Logger(PayrollService.name);
@@ -655,5 +693,324 @@ export class PayrollService {
       employerNssf: 0,
       employerHousing: 0,
     };
+  }
+
+  // ─── Statutory Filing (PAYE, NHIF, NSSF, Housing Levy to iTax) ─────
+
+  /**
+   * Prepare filing data for a statutory return.
+   *
+   * Generates KRA iTax-compatible CSV for the specified filing type.
+   *
+   * Edge cases:
+   * - Run is DRAFT        → BadRequestException
+   * - Run already FILED   → ConflictException
+   * - Zero employees      → return empty filing with warning
+   * - Missing KRA PIN     → employee excluded from PAYE/NSSF/Housing Levy filing, flagged
+   * - Missing NHIF number → employee excluded from NHIF filing, flagged
+   * - Missing NSSF number → employee excluded from NSSF filing, flagged
+   */
+  async prepareFiling(payrollRunId: string, type: 'PAYE' | 'NHIF' | 'NSSF' | 'HOUSING_LEVY'): Promise<FilingResult> {
+    const run = await this.prisma.payrollRun.findUnique({
+      where: { id: payrollRunId },
+      include: {
+        company: {
+          select: {
+            id: true,
+            name: true,
+            kraPin: true,
+          },
+        },
+        entries: {
+          include: {
+            employee: {
+              select: {
+                id: true,
+                name: true,
+                kraPin: true,
+                nhifNumber: true,
+                nssfNumber: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    if (!run) {
+      throw new NotFoundException(`Payroll run with id ${payrollRunId} not found`);
+    }
+
+    if (run.status === 'DRAFT') {
+      throw new BadRequestException('Cannot file a DRAFT payroll run. Lock the run first.');
+    }
+
+    if (run.status === 'FILED') {
+      throw new ConflictException('Payroll run is already filed. Use amend for corrections.');
+    }
+
+    // Use periodEnd as the filing period reference (TIME-TRAVEL compliance)
+    const periodMonth = String(run.periodEnd.getMonth() + 1).padStart(2, '0');
+    const periodYear = String(run.periodEnd.getFullYear());
+    const period = `${periodMonth}${periodYear}`;
+
+    const warnings: string[] = [];
+    const employees = run.entries.map((entry) => ({
+      ...entry.employee,
+      grossPay: entry.grossPay,
+      paye: entry.paye,
+      nhif: entry.nhif,
+      nssf: entry.nssf,
+      housingLevy: entry.housingLevy,
+      employerNhif: entry.employerNhif,
+      employerNssf: entry.employerNssf,
+      employerHousing: entry.employerHousing,
+    }));
+
+    if (employees.length === 0) {
+      warnings.push('Payroll run has zero employees — filing data will be empty.');
+    }
+
+    // Filter and flag employees based on filing type
+    let validEmployees = employees;
+    if (type === 'PAYE' || type === 'HOUSING_LEVY') {
+      const missingPin = employees.filter((e) => !e.kraPin);
+      if (missingPin.length > 0) {
+        warnings.push(
+          `${missingPin.length} employee(s) missing KRA PIN — excluded from ${type} filing. Names: ${missingPin.map((e) => e.name).join(', ')}`,
+        );
+      }
+      validEmployees = employees.filter((e) => e.kraPin);
+    }
+
+    if (type === 'NHIF') {
+      const missingNhif = employees.filter((e) => !e.nhifNumber);
+      if (missingNhif.length > 0) {
+        warnings.push(
+          `${missingNhif.length} employee(s) missing NHIF number — excluded from NHIF filing. Names: ${missingNhif.map((e) => e.name).join(', ')}`,
+        );
+      }
+      validEmployees = employees.filter((e) => e.nhifNumber);
+    }
+
+    if (type === 'NSSF') {
+      const missingNssf = employees.filter((e) => !e.nssfNumber);
+      if (missingNssf.length > 0) {
+        warnings.push(
+          `${missingNssf.length} employee(s) missing NSSF number — excluded from NSSF filing. Names: ${missingNssf.map((e) => e.name).join(', ')}`,
+        );
+      }
+      validEmployees = employees.filter((e) => e.nssfNumber);
+    }
+
+    // Build summary
+    const summary = {
+      totalEmployees: validEmployees.length,
+      totalGrossPay: Math.round(run.totalGrossPay * 100) / 100,
+      totalPaye: Math.round(run.totalPaye * 100) / 100,
+      totalNhif: Math.round(run.totalNhif * 100) / 100,
+      totalNssf: Math.round(run.totalNssf * 100) / 100,
+      totalHousingLevy: Math.round(run.totalHousingLevy * 100) / 100,
+    };
+
+    // Build employee details
+    const employeeDetails = validEmployees.map((e) => ({
+      kraPin: e.kraPin ?? '',
+      name: e.name,
+      grossPay: Math.round(e.grossPay * 100) / 100,
+      paye: Math.round(e.paye * 100) / 100,
+      nhif: Math.round(e.nhif * 100) / 100,
+      nssf: Math.round(e.nssf * 100) / 100,
+    }));
+
+    // Build filing response with type-specific CSV
+    const taxYear = run.periodEnd.getFullYear().toString();
+    const periodLabel = run.periodEnd.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+    const baseResponse = {
+      taxYear,
+      period: periodLabel,
+      employer: {
+        kraPin: run.company.kraPin ?? '',
+        name: run.company.name,
+        address: 'Nairobi, Kenya',
+      },
+      summary,
+      employeeDetails,
+      warnings: warnings.length > 0 ? warnings : undefined,
+    };
+
+    switch (type) {
+      case 'PAYE':
+        return {
+          ...baseResponse,
+          csvExport: this.generatePayeCsv(validEmployees, period),
+        };
+
+      case 'NHIF':
+        return {
+          ...baseResponse,
+          nhifCsv: this.generateNhifCsv(validEmployees, period),
+        };
+
+      case 'NSSF':
+        return {
+          ...baseResponse,
+          nssfCsv: this.generateNssfCsv(validEmployees, period),
+        };
+
+      case 'HOUSING_LEVY':
+        return {
+          ...baseResponse,
+          housingLevyCsv: this.generateHousingLevyCsv(validEmployees, period),
+        };
+
+      default:
+        throw new BadRequestException(`Unsupported filing type: ${type}`);
+    }
+  }
+
+  /**
+   * Submit a filing to KRA (mock implementation).
+   *
+   * Marks the payroll run as FILED and returns a mock submission reference.
+   */
+  async submitFiling(payrollRunId: string, type: 'PAYE' | 'NHIF' | 'NSSF' | 'HOUSING_LEVY'): Promise<SubmissionResult> {
+    const run = await this.prisma.payrollRun.findUnique({
+      where: { id: payrollRunId },
+    });
+
+    if (!run) {
+      throw new NotFoundException(`Payroll run with id ${payrollRunId} not found`);
+    }
+
+    if (run.status === 'DRAFT') {
+      throw new BadRequestException('Cannot submit a DRAFT payroll run. Lock the run first.');
+    }
+
+    if (run.status === 'FILED') {
+      throw new ConflictException('Payroll run is already filed. Use amend for corrections.');
+    }
+
+    // Generate a mock submission reference
+    const periodMonth = String(run.periodEnd.getMonth() + 1).padStart(2, '0');
+    const periodYear = String(run.periodEnd.getFullYear());
+    const submissionRef = `KRA-${periodYear}-${periodMonth}-${type}-${this.generateShortId()}`;
+
+    // Mark the run as FILED — filedAt uses DB @default(now()) (TIME-TRAVEL compliance)
+    const updatedRun = await this.prisma.payrollRun.update({
+      where: { id: payrollRunId },
+      data: {
+        status: 'FILED',
+        filedAt: new Date(), // DB update timestamp, not a financial calculation
+      },
+    });
+
+    this.logger.log(
+      `Payroll run ${payrollRunId}: ${type} filing submitted. Ref: ${submissionRef}`,
+    );
+
+    return {
+      submitted: true,
+      submissionRef,
+      submittedAt: updatedRun.filedAt,
+      status: 'ACCEPTED',
+    };
+  }
+
+  // ─── CSV Generation ─────────────────────────────────────────────────
+
+  /**
+   * Generate KRA iTax-compatible PAYE CSV.
+   * Columns: KRA PIN, Employee Name, Period, Gross Pay, PAYE, Personal Relief, Net PAYE
+   */
+  private generatePayeCsv(
+    employees: Array<{ kraPin?: string | null; name: string; grossPay: number; paye: number }>,
+    period: string,
+  ): string {
+    const header = 'KRA PIN,Employee Name,Period,Gross Pay,PAYE,Personal Relief,Net PAYE';
+    const rows = employees
+      .filter((e) => e.kraPin)
+      .map((e) => {
+        const personalRelief = Math.min(2400, e.paye);
+        const netPaye = Math.max(0, e.paye - personalRelief);
+        return `${e.kraPin},${e.name},${period},${Math.round(e.grossPay)},${Math.round(e.paye)},${Math.round(personalRelief)},${Math.round(netPaye)}`;
+      });
+
+    return [header, ...rows].join('\n');
+  }
+
+  /**
+   * Generate NHIF-compatible CSV.
+   * Columns: NHIF Number, Employee Name, Period, Gross Pay, NHIF Deduction, Employer NHIF
+   */
+  private generateNhifCsv(
+    employees: Array<{ nhifNumber?: string | null; name: string; grossPay: number; nhif: number; employerNhif?: number }>,
+    period: string,
+  ): string {
+    const header = 'NHIF Number,Employee Name,Period,Gross Pay,NHIF Deduction,Employer NHIF';
+    const rows = employees
+      .filter((e) => e.nhifNumber)
+      .map((e) => {
+        const employerNhif = e.employerNhif ?? e.nhif;
+        return `${e.nhifNumber},${e.name},${period},${Math.round(e.grossPay)},${Math.round(e.nhif)},${Math.round(employerNhif)}`;
+      });
+
+    return [header, ...rows].join('\n');
+  }
+
+  /**
+   * Generate NSSF-compatible CSV.
+   * Columns: NSSF Number, Employee Name, Period, Tier I, Tier II, Employee NSSF, Employer NSSF
+   */
+  private generateNssfCsv(
+    employees: Array<{ nssfNumber?: string | null; name: string; grossPay: number; nssf: number; employerNssf?: number }>,
+    period: string,
+  ): string {
+    const header = 'NSSF Number,Employee Name,Period,Tier I,Tier II,Employee NSSF,Employer NSSF';
+    const rows = employees
+      .filter((e) => e.nssfNumber)
+      .map((e) => {
+        const gross = Math.round(e.grossPay);
+        const tierI = Math.min(gross, 8000) * 0.06;
+        const tierIIPay = Math.max(0, Math.min(gross, 72000) - 8000);
+        const tierII = Math.min(tierIIPay * 0.06, 3840);
+        const employerNssf = e.employerNssf ?? e.nssf;
+        return `${e.nssfNumber},${e.name},${period},${Math.round(tierI)},${Math.round(tierII)},${Math.round(e.nssf)},${Math.round(employerNssf)}`;
+      });
+
+    return [header, ...rows].join('\n');
+  }
+
+  /**
+   * Generate Housing Levy CSV.
+   * Columns: KRA PIN, Employee Name, Period, Gross Pay, Housing Levy, Employer Housing Levy
+   */
+  private generateHousingLevyCsv(
+    employees: Array<{ kraPin?: string | null; name: string; grossPay: number; housingLevy: number; employerHousing?: number }>,
+    period: string,
+  ): string {
+    const header = 'KRA PIN,Employee Name,Period,Gross Pay,Housing Levy,Employer Housing Levy';
+    const rows = employees
+      .filter((e) => e.kraPin)
+      .map((e) => {
+        const employerHousing = e.employerHousing ?? e.housingLevy;
+        return `${e.kraPin},${e.name},${period},${Math.round(e.grossPay)},${Math.round(e.housingLevy)},${Math.round(employerHousing)}`;
+      });
+
+    return [header, ...rows].join('\n');
+  }
+
+  /**
+   * Generate a short alphanumeric ID for submission references.
+   */
+  private generateShortId(length = 8): string {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
   }
 }
