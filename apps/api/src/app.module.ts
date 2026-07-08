@@ -17,6 +17,7 @@ import { GamificationModule } from './modules/gamification/gamification.module';
 import { StatementsModule } from './modules/statements/statements.module';
 import { HealthScoreModule } from './modules/health-score/health-score.module';
 import { WizardModule } from './modules/wizard/wizard.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
 
 @Module({
   imports: [
@@ -47,6 +48,7 @@ import { WizardModule } from './modules/wizard/wizard.module';
     GamificationModule,
     HealthScoreModule,
     WizardModule,
+    DashboardModule,
     StatementsModule,
   ],
   providers: [
