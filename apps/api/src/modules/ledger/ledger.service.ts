@@ -509,9 +509,10 @@ export class LedgerService {
    * Generate a sequential serial number per company for audit trail compliance.
    * Format: {PREFIX}-{YYYYMMDD}-{SEQUENTIAL_5_DIGITS}
    * Example: JE-20260706-00001, INC-20260706-00042
+   * @param now - Optional timestamp override for TIME-TRAVEL compliance (defaults to new Date())
    */
-  private async generateSerialNumber(companyId: string, prefix: string): Promise<string> {
-    const today = new Date();
+  private async generateSerialNumber(companyId: string, prefix: string, now?: Date): Promise<string> {
+    const today = now || new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
     
     // Count existing entries with today's prefix to get the sequence number

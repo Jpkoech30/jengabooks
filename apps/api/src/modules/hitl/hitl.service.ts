@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class HitlService {
@@ -105,7 +106,9 @@ export class HitlService {
     action: 'APPROVE' | 'REJECT' | 'EDIT',
     correctedData?: string,
     xpAwarded?: number,
+    now?: Date,
   ) {
+    const timestamp = now || new Date();
     const review = await this.prisma.pendingReview.findUnique({ where: { id } });
     if (!review) {
       throw new NotFoundException(`Review with id ${id} not found`);
@@ -119,7 +122,7 @@ export class HitlService {
     // Apply the resolution action to the linked entity
     const linkedReview = review as any;
     if (action !== 'REJECT' && linkedReview.linkedEntityId && linkedReview.linkedEntityType) {
-      await this.applyResolution(linkedReview, action, correctedData);
+      await this.applyResolution(linkedReview, action, correctedData, timestamp);
     }
 
     // Resolve review and award XP in a transaction
@@ -129,7 +132,7 @@ export class HitlService {
         data: {
           status: 'RESOLVED',
           resolvedBy: userId,
-          resolvedAt: new Date(),
+          resolvedAt: timestamp,
           resolution,
           resolutionAction: action === 'APPROVE' ? 'APPROVED' : action === 'REJECT' ? 'REJECTED' : 'EDITED',
           xpAwarded: xp,
@@ -153,7 +156,6 @@ export class HitlService {
       });
 
       const totalXpValue = totalXp._sum.points || 0;
-      const { GamificationService } = await import('../gamification/gamification.service');
       const levelInfo = GamificationService.calculateLevel(totalXpValue);
 
       await tx.userLevel.upsert({
@@ -175,7 +177,9 @@ export class HitlService {
     review: any,
     action: string,
     correctedData?: string,
+    now?: Date,
   ) {
+    const timestamp = now || new Date();
     const { linkedEntityId, linkedEntityType } = review;
 
     switch (linkedEntityType) {
@@ -205,6 +209,7 @@ export class HitlService {
         // Approve: create the journal entry that was blocked
         if (action === 'APPROVE' && correctedData) {
           const data = JSON.parse(correctedData);
+          const ts = timestamp.getTime();
           await this.prisma.journalEntry.create({
             data: {
               companyId: review.companyId,
@@ -215,7 +220,7 @@ export class HitlService {
               reference: data.reference,
               entryDate: new Date(data.entryDate),
               postedById: data.postedById,
-              serialNumber: `HITL-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
+              serialNumber: `HITL-${ts.toString(36).toUpperCase()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`,
             },
           });
         }

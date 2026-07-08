@@ -15,7 +15,8 @@ export class HealthScoreService {
 
   constructor(private readonly prisma: PrismaService) {}
 
-  async getHealthScore(companyId: string) {
+  async getHealthScore(companyId: string, now?: Date) {
+    const timestamp = now || new Date();
     // Check for a recent cached score (within last hour)
     const recent = await this.prisma.businessHealthScore.findFirst({
       where: { companyId },
@@ -23,7 +24,7 @@ export class HealthScoreService {
     });
 
     if (recent) {
-      const elapsed = Date.now() - new Date(recent.calculatedAt).getTime();
+      const elapsed = timestamp.getTime() - new Date(recent.calculatedAt).getTime();
       if (elapsed < 3600000) {
         // Cache is less than 1 hour old
         // Parse pillarScores which may be stored as JSON string or JSON object
@@ -35,7 +36,7 @@ export class HealthScoreService {
           // Corrupted cache data — fall through to recalculate
           pillars = await this.calculatePillars(companyId);
           const overallScore = this.calculateOverall(pillars);
-          return { overallScore, pillars, calculatedAt: new Date().toISOString(), cached: false };
+          return { overallScore, pillars, calculatedAt: timestamp.toISOString(), cached: false };
         }
         return {
           overallScore: recent.overallScore,
@@ -62,7 +63,7 @@ export class HealthScoreService {
     return {
       overallScore,
       pillars,
-      calculatedAt: new Date().toISOString(),
+      calculatedAt: timestamp.toISOString(),
       cached: false,
     };
   }

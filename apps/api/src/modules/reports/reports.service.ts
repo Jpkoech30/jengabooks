@@ -11,7 +11,8 @@ export class ReportsService {
     private readonly gamificationService: GamificationService,
   ) {}
 
-  async getProfitLoss(companyId: string, userId: string, fromDate?: string, toDate?: string) {
+  async getProfitLoss(companyId: string, userId: string, fromDate?: string, toDate?: string, now?: Date) {
+    const timestamp = now || new Date();
     const where: any = { companyId, deletedAt: null };
     if (fromDate || toDate) {
       where.entryDate = {};
@@ -66,11 +67,12 @@ export class ReportsService {
       totalIncome,
       totalExpenses,
       netIncome,
-      generatedAt: new Date().toISOString(),
+      generatedAt: timestamp.toISOString(),
     };
   }
 
-  async getBalanceSheet(companyId: string, asOf?: string) {
+  async getBalanceSheet(companyId: string, asOf?: string, now?: Date) {
+    const timestamp = now || new Date();
     const where: any = { companyId, deletedAt: null };
     if (asOf) {
       where.entryDate = { lte: new Date(asOf) };
@@ -112,7 +114,7 @@ export class ReportsService {
     const totalEquity = equity.reduce((sum, a) => sum + a.balance, 0);
 
     return {
-      asOf: asOf || new Date().toISOString(),
+      asOf: asOf || timestamp.toISOString(),
       assets,
       liabilities,
       equity,
@@ -121,11 +123,12 @@ export class ReportsService {
       totalEquity,
       accountingEquation: `${totalAssets} = ${totalLiabilities} + ${totalEquity}`,
       balanced: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01,
-      generatedAt: new Date().toISOString(),
+      generatedAt: timestamp.toISOString(),
     };
   }
 
-  async getTrialBalance(companyId: string, asOf?: string) {
+  async getTrialBalance(companyId: string, asOf?: string, now?: Date) {
+    const timestamp = now || new Date();
     const where: any = { companyId, deletedAt: null };
     if (asOf) {
       where.entryDate = { lte: new Date(asOf) };
@@ -166,12 +169,13 @@ export class ReportsService {
       totalDebits,
       totalCredits,
       balanced: Math.abs(totalDebits - totalCredits) < 0.01,
-      asOf: asOf || new Date().toISOString(),
-      generatedAt: new Date().toISOString(),
+      asOf: asOf || timestamp.toISOString(),
+      generatedAt: timestamp.toISOString(),
     };
   }
 
-  async getCashFlow(companyId: string, fromDate?: string, toDate?: string) {
+  async getCashFlow(companyId: string, fromDate?: string, toDate?: string, now?: Date) {
+    const timestamp = now || new Date();
     const where: any = { companyId, deletedAt: null };
     if (fromDate || toDate) {
       where.entryDate = {};
@@ -244,11 +248,12 @@ export class ReportsService {
         net: netFinancing,
       },
       netCashChange,
-      generatedAt: new Date().toISOString(),
+      generatedAt: timestamp.toISOString(),
     };
   }
 
-  async getAuditTrail(companyId: string, options?: { limit?: number; offset?: number; entityType?: string }) {
+  async getAuditTrail(companyId: string, options?: { limit?: number; offset?: number; entityType?: string }, now?: Date) {
+    const timestamp = now || new Date();
     const take = options?.limit || 50;
     const skip = options?.offset || 0;
 
@@ -271,7 +276,7 @@ export class ReportsService {
       total,
       limit: take,
       offset: skip,
-      generatedAt: new Date().toISOString(),
+      generatedAt: timestamp.toISOString(),
     };
   }
 }

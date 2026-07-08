@@ -1,0 +1,12 @@
+[eval]:1
+const { PrismaClient } = require('@prisma/client'); const p = new PrismaClient({ datasources: { db: { url: 'postgresql://postgres:postgres@127.0.0.1:5432/jengabooks?schema=public' } } }); p.\().then(() = console.log('CONNECTED via 127.0.0.1'); return p.\(); }).catch(e = console.log('FAILED 127.0.0.1:', e.message); return p.\().catch(()=; }).then(() = const p2 = new PrismaClient({ datasources: { db: { url: 'postgresql://postgres:postgres@localhost:5432/jengabooks?schema=public' } } }); return p2.\().then(() = console.log('CONNECTED via localhost'); return p2.\(); }).catch(e = console.log('FAILED localhost:', e.message); return p2.\().catch(()=; }); });
+                                                                                                                                                                                              ^
+Expected ident
+
+SyntaxError: Invalid or unexpected token
+    at makeContextifyScript (node:internal/vm:194:14)
+    at compileScript (node:internal/process/execution:388:10)
+    at evalTypeScript (node:internal/process/execution:260:22)
+    at node:internal/main/eval_string:71:3
+
+Node.js v24.18.0

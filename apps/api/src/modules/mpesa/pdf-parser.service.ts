@@ -59,16 +59,15 @@ export class PdfParserService {
   }
 
   /**
-   * Detect summary table lines like "Buy Goods84,298.000.00" or "Fees0.00463.60"
-   * These are concatenated text+number patterns from the PDF summary section.
+   * Detect summary table lines from PDF header section only (not transaction lines).
+   * These are lines like "Buy Goods84,298.000.00" or "Fees0.00463.60"
+   * which appear BEFORE the first receipt number in the document.
+   * Transaction lines like "Completed400.000.00..." should NOT be filtered.
    */
   private isSummaryLine(line: string): boolean {
-    // Lines where text is immediately followed by a formatted number (no space)
-    // e.g., "Buy Goods84,298.000.00", "Fees0.00463.60", "Pay Bill0.000.00",
-    //       "Payment to Mobile Number0.000.00", "Withdraw to Bank0.000.00",
-    //       "Withdraw at Agent0.000.00", "Sell Airtime0.00300.00",
-    //       "Other13,785.0011.00", "Total98,083.00774.60"
-    return /^[A-Za-z\s]+\d{1,3}(?:,\d{3})*\.\d{2}\d{1,3}(?:,\d{3})*\.\d{2}/.test(line);
+    // Only match lines that START with summary category keywords followed immediately by numbers
+    // This avoids matching transaction data like "Completed400.000.00114,891.09Customer"
+    return /^(?:Buy Goods|Pay Bill|Payment to Mobile Number|Withdraw to Bank|Withdraw at Agent|Sell Airtime|Fees|Other|Total)\s*\d/.test(line);
   }
 
   private parseMpesaStatement(text: string): ExtractedTransaction[] {

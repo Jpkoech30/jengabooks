@@ -3,6 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule } from '@nestjs/config';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { PrismaModule } from './prisma/prisma.module';
+import { QueueModule } from './queues/queue.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { LedgerModule } from './modules/ledger/ledger.module';
@@ -13,6 +14,7 @@ import { SyncModule } from './modules/sync/sync.module';
 import { HitlModule } from './modules/hitl/hitl.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { GamificationModule } from './modules/gamification/gamification.module';
+import { StatementsModule } from './modules/statements/statements.module';
 import { HealthScoreModule } from './modules/health-score/health-score.module';
 import { WizardModule } from './modules/wizard/wizard.module';
 
@@ -31,6 +33,7 @@ import { WizardModule } from './modules/wizard/wizard.module';
       ttl: 60000,
       limit: 120,
     }]),
+    QueueModule,
     PrismaModule,
     AuthModule,
     TenantsModule,
@@ -44,6 +47,7 @@ import { WizardModule } from './modules/wizard/wizard.module';
     GamificationModule,
     HealthScoreModule,
     WizardModule,
+    StatementsModule,
   ],
   providers: [
     {

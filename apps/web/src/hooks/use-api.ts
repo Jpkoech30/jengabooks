@@ -102,7 +102,7 @@ export function useSubmitToKra() {
 export function useMpesaTransactions() {
   return useQuery<PaginatedResponse<MpesaTransaction>>({
     queryKey: ['mpesa-transactions'],
-    queryFn: () => api.get('/mpesa/transactions'),
+    queryFn: () => api.get('/mpesa'),
   });
 }
 

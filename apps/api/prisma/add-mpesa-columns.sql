@@ -1,0 +1,4 @@
+ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS "paidIn" DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS "withdrawn" DOUBLE PRECISION DEFAULT 0;
+ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS "customerName" TEXT;
+ALTER TABLE mpesa_transactions ADD COLUMN IF NOT EXISTS "transactionType" TEXT;

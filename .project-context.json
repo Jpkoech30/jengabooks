@@ -1,0 +1,239 @@
+{
+  "project": {
+    "name": "JengaBooks",
+    "description": "Multi-tenant Kenyan accounting SaaS — M-Pesa first-class citizen, KRA eTIMS integration, AI-powered reconciliation, gamified engagement",
+    "version": "1.0.0",
+    "status": "development",
+    "lastAudited": "2026-07-07"
+  },
+
+  "workspace": {
+    "type": "monorepo",
+    "packageManager": "npm@11.16.0",
+    "orchestrator": "turbo@^2.0.0",
+    "nodeEngine": ">=20.0.0",
+    "typescript": "^5.4.0"
+  },
+
+  "apps": {
+    "api": {
+      "path": "apps/api",
+      "framework": "NestJS 10",
+      "language": "TypeScript",
+      "port": 3000,
+      "globalPrefix": "api/v1",
+      "orm": "Prisma 5",
+      "database": "PostgreSQL 15",
+      "cache": "Redis 7 (AOF + RDB)",
+      "queue": "BullMQ",
+      "auth": "JWT + httpOnly cookies",
+      "modules": [
+        "auth",
+        "ledger",
+        "mpesa",
+        "etims",
+        "ai",
+        "hitl",
+        "reports",
+        "gamification",
+        "health-score",
+        "workflow",
+        "tenants",
+        "sync",
+        "reconciliation",
+        "wizard"
+      ],
+      "testing": {
+        "totalTests": 234,
+        "testSuites": 24,
+        "framework": "Jest 29 + Supertest"
+      }
+    },
+    "web": {
+      "path": "apps/web",
+      "framework": "React 18",
+      "bundler": "Vite",
+      "styling": "TailwindCSS",
+      "state": "Zustand",
+      "dataFetching": "TanStack React Query",
+      "routing": "React Router",
+      "realTime": "Socket.io",
+      "pages": [
+        "dashboard",
+        "login",
+        "register",
+        "ledger",
+        "accounts",
+        "etims",
+        "mpesa",
+        "hitl-hub",
+        "reports",
+        "workflow",
+        "team",
+        "settings",
+        "help",
+        "not-found"
+      ],
+      "uiComponents": [
+        "button",
+        "card",
+        "input",
+        "badge",
+        "modal",
+        "table",
+        "select",
+        "toggle",
+        "file-upload",
+        "searchable-select",
+        "skeleton",
+        "empty-state",
+        "error-boundary",
+        "toast",
+        "xp-bar"
+      ],
+      "devPort": 5173,
+      "proxy": {
+        "path": "/api",
+        "rewrite": "/api/v1",
+        "targetPort": 3000
+      }
+    },
+    "mobile": {
+      "path": "apps/mobile",
+      "framework": "Expo 51 (React Native)",
+      "styling": "NativeWind",
+      "offline": "WatermelonDB",
+      "apiBaseUrl": "http://localhost:3000/api/v1",
+      "screens": [
+        "login",
+        "dashboard",
+        "ledger",
+        "etims",
+        "hitl",
+        "reports",
+        "settings"
+      ]
+    }
+  },
+
+  "packages": {
+    "shared": {
+      "path": "packages/shared",
+      "exports": [
+        "enums",
+        "theme",
+        "schemas",
+        "permissions"
+      ]
+    }
+  },
+
+  "featureFlags": {
+    "aiAgents": true,
+    "deepseekIntegration": "configurable (degrades gracefully if unconfigured)",
+    "mpesaPdfParsing": true,
+    "offlineSync": true,
+    "gamification": true,
+    "etimsRealApi": false
+  },
+
+  "designTokens": {
+    "primary": "#0A5C36",
+    "secondary": "#E8A317",
+    "error": "#BB1E10",
+    "surfaceLight": "#FBF8F1",
+    "surfaceDark": "#1A1A1F",
+    "roles": [
+      "SUPER_ADMIN",
+      "FIRM_OWNER",
+      "TENANT_ADMIN",
+      "ACCOUNTANT",
+      "SME_OWNER",
+      "AUDITOR",
+      "BANK_OFFICER"
+    ]
+  },
+
+  "rbac": {
+    "totalRoles": 7,
+    "highestRole": "SUPER_ADMIN",
+    "defaultRole": "SME_OWNER",
+    "rowLevelSecurity": true
+  },
+
+  "deployment": {
+    "target": "Vultr Johannesburg (South Africa)",
+    "strategy": "Docker Compose → Vultr High Frequency VMs → Managed Databases",
+    "tier1": "Single VM",
+    "tier2": "Horizontal scaling with load balancer",
+    "tier3": "High availability with managed PG + Redis + object storage"
+  },
+
+  "knownIssues": [
+    {
+      "id": "FIX-001",
+      "severity": "critical",
+      "description": "Vite proxy targeted port 3001 but API defaults to 3000",
+      "status": "resolved",
+      "file": "apps/web/vite.config.ts"
+    },
+    {
+      "id": "FIX-002",
+      "severity": "minor",
+      "description": "useMpesaTransactions() hook called /mpesa/transactions instead of /mpesa",
+      "status": "resolved",
+      "file": "apps/web/src/hooks/use-api.ts"
+    },
+    {
+      "id": "FIX-003",
+      "severity": "critical",
+      "description": "Dashboard non-null assertion crash when API calls fail",
+      "status": "resolved",
+      "file": "apps/web/src/pages/dashboard.tsx"
+    },
+    {
+      "id": "FIX-004",
+      "severity": "high",
+      "description": "In-memory refresh token store violated stateless requirement — migrated to DB-backed RefreshToken model",
+      "status": "resolved",
+      "file": "apps/api/prisma/schema.prisma, apps/api/src/modules/auth/auth.service.ts"
+    },
+    {
+      "id": "FIX-005",
+      "severity": "high",
+      "description": "GamificationService dynamically imported via await import() in wizard.service.ts and hitl.service.ts",
+      "status": "resolved",
+      "file": "apps/api/src/modules/wizard/wizard.service.ts, apps/api/src/modules/hitl/hitl.service.ts"
+    },
+    {
+      "id": "FIX-006",
+      "severity": "high",
+      "description": "TIME-TRAVEL violations: new Date() used for generatedAt in reports.service.ts, health-score.service.ts, ledger.service.ts, hitl.service.ts",
+      "status": "resolved",
+      "file": "apps/api/src/modules/reports/reports.service.ts, apps/api/src/modules/health-score/health-score.service.ts, apps/api/src/modules/ledger/ledger.service.ts, apps/api/src/modules/hitl/hitl.service.ts"
+    },
+    {
+      "id": "FIX-007",
+      "severity": "medium",
+      "description": "Enum/RBAC mismatch: CompanyRole had 5 roles instead of the documented 7 (SUPER_ADMIN, TENANT_ADMIN, BANK_OFFICER)",
+      "status": "resolved",
+      "file": "packages/shared/src/enums.ts, packages/shared/src/permissions.ts"
+    },
+    {
+      "id": "FIX-008",
+      "severity": "low",
+      "description": "HITL Hub frontend hardcoded xpAwarded: 50 — removed, server now determines XP",
+      "status": "resolved",
+      "file": "apps/web/src/pages/hitl-hub.tsx, apps/mobile/src/app/hitl.tsx"
+    }
+  ],
+
+  "activePlans": [
+    "plans/reports-ui-ux-plan.md",
+    "plans/ui-styling-implementation-plan.md",
+    "plans/frontend-gap-analysis.md",
+    "plans/mpesa-pdf-upload-plan.md",
+    "plans/mpesa-pdf-parser-enhancements.md",
+    "plans/acct-workflow-gap-analysis.md"
+  ]
+}

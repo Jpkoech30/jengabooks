@@ -15,7 +15,7 @@ interface DashboardData {
   totalDebits: number;
   totalCredits: number;
   balanced: boolean;
-  recentEntries: Array<{ id: string; description: string; amount: number; direction: string; entryDate: string; account: { code: string; name: string } }>;
+  recentEntries: Array<{ id: string; description: string; amount: number; direction: string; entryDate: string; account: { code: string; name: string }; aiConfidence?: number | null }>;
   xpScore?: { score: number; level: number; xpToNextLevel: number };
 }
 
@@ -66,6 +66,8 @@ export function Dashboard() {
       } catch (e) {
         console.error('Failed to load dashboard:', e);
       } finally {
+        // Ensure data is never null when loading completes, so the UI doesn't crash
+        setData((prev) => prev || { totalEntries: 0, totalDebits: 0, totalCredits: 0, balanced: false, recentEntries: [] });
         setLoading(false);
       }
     }
@@ -92,7 +94,24 @@ export function Dashboard() {
 
   const formatKES = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
 
+  const renderConfidenceBadge = (confidence: number | null | undefined) => {
+    if (confidence == null) return <span className="text-xs text-gray-400">—</span>;
+    const tier = confidence >= 0.9 ? 'high' : confidence >= 0.7 ? 'medium' : 'low';
+    const colors = {
+      high: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+      medium: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300',
+      low: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+    };
+    const labels = { high: '✓ High', medium: '~ Med', low: '! Low' };
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${colors[tier]}`}>
+        {labels[tier]}
+      </span>
+    );
+  };
+
   if (loading) return <DashboardSkeleton />;
+  if (!data) return <DashboardSkeleton />; // Fallback if all API calls failed
 
   const earnedBadges = badges.filter(b => b.earned);
 
@@ -220,6 +239,7 @@ export function Dashboard() {
                     <th className="text-left py-3 px-4 font-medium text-gray-500 text-xs uppercase">Description</th>
                     <th className="text-right py-3 px-4 font-medium text-gray-500 text-xs uppercase">Amount</th>
                     <th className="text-left py-3 px-4 font-medium text-gray-500 text-xs uppercase">Account</th>
+                    <th className="text-center py-3 px-4 font-medium text-gray-500 text-xs uppercase">Confidence</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -231,6 +251,7 @@ export function Dashboard() {
                       <td className="py-3 px-4">
                         <Badge variant={entry.direction === 'DEBIT' ? 'info' : 'success'} size="sm">{entry.account?.code}</Badge>
                       </td>
+                      <td className="py-3 px-4 text-center">{renderConfidenceBadge(entry.aiConfidence)}</td>
                     </tr>
                   ))}
                 </tbody>

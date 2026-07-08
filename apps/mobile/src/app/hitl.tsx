@@ -42,8 +42,8 @@ export default function HITLScreen() {
   const resolveTask = async (taskId: string) => {
     setResolvingId(taskId);
     try {
-      await api.post(`/hitl/${taskId}/resolve`, { resolution: 'Resolved via mobile', xpAwarded: 50 });
-      Alert.alert('Resolved', 'Task has been resolved. +50 XP earned!');
+      await api.post(`/hitl/${taskId}/resolve`, { resolution: 'Resolved via mobile' });
+      Alert.alert('Resolved', 'Task has been resolved successfully!');
       loadTasks();
     } catch (e) {
       Alert.alert('Error', 'Failed to resolve task. Please try again.');

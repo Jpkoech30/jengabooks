@@ -1,10 +1,12 @@
 // Company roles
 export const CompanyRole = {
-  SME_OWNER: 'SME_OWNER',
+  SUPER_ADMIN: 'SUPER_ADMIN',
   FIRM_OWNER: 'FIRM_OWNER',
+  TENANT_ADMIN: 'TENANT_ADMIN',
   ACCOUNTANT: 'ACCOUNTANT',
-  VIEWER: 'VIEWER',
+  SME_OWNER: 'SME_OWNER',
   AUDITOR: 'AUDITOR',
+  BANK_OFFICER: 'BANK_OFFICER',
 } as const;
 
 export type CompanyRole = (typeof CompanyRole)[keyof typeof CompanyRole];
@@ -144,6 +146,37 @@ export const Badge = {
 } as const;
 
 export type Badge = (typeof Badge)[keyof typeof Badge];
+
+// Statement upload statuses
+export const StatementUploadStatus = {
+  PENDING_PARSING: 'PENDING_PARSING',
+  PARSING: 'PARSING',
+  PARSED: 'PARSED',
+  RECONCILED: 'RECONCILED',
+  FAILED: 'FAILED',
+} as const;
+
+export type StatementUploadStatus = (typeof StatementUploadStatus)[keyof typeof StatementUploadStatus];
+
+// Financial institutions supported for statement uploads
+export const Institution = {
+  MPESA: 'MPESA',
+  KCB: 'KCB',
+  EQUITY: 'EQUITY',
+  COOP: 'COOP',
+  SCB: 'SCB',
+  OTHER: 'OTHER',
+} as const;
+
+export type Institution = (typeof Institution)[keyof typeof Institution];
+
+// Detection methods
+export const DetectionMethod = {
+  AUTO: 'AUTO',
+  USER_SELECTED: 'USER_SELECTED',
+} as const;
+
+export type DetectionMethod = (typeof DetectionMethod)[keyof typeof DetectionMethod];
 
 // XP amounts for wizard steps
 export const WizardXpReward: Record<string, number> = {

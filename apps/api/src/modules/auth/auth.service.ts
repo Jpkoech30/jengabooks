@@ -7,9 +7,6 @@ import * as crypto from 'crypto';
 
 @Injectable()
 export class AuthService {
-  // In-memory refresh token store (in production, use Redis/DB)
-  private refreshTokens = new Map<string, { userId: string; expiresAt: Date }>();
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
@@ -59,7 +56,7 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: '24h' }),
-      refresh_token: this.generateRefreshToken(user.id),
+      refresh_token: await this.generateRefreshToken(user.id),
       user: {
         id: user.id,
         email: user.email,
@@ -125,7 +122,7 @@ export class AuthService {
 
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: '24h' }),
-      refresh_token: this.generateRefreshToken(result.user.id),
+      refresh_token: await this.generateRefreshToken(result.user.id),
       user: {
         id: result.user.id,
         email: result.user.email,
@@ -137,10 +134,19 @@ export class AuthService {
     };
   }
 
-  async refresh(refreshToken: string) {
-    const stored = this.refreshTokens.get(refreshToken);
-    if (!stored || stored.expiresAt < new Date()) {
-      this.refreshTokens.delete(refreshToken);
+  async refresh(refreshToken: string, now?: Date) {
+    const timestamp = now || new Date();
+    const tokenHash = this.hashToken(refreshToken);
+
+    const stored = await this.prisma.refreshToken.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!stored || stored.expiresAt < timestamp) {
+      if (stored) {
+        // Clean up expired token
+        await this.prisma.refreshToken.delete({ where: { id: stored.id } }).catch(() => {});
+      }
       throw new UnauthorizedException('Invalid or expired refresh token');
     }
 
@@ -170,12 +176,12 @@ export class AuthService {
       role: membership.role,
     };
 
-    // Remove old refresh token
-    this.refreshTokens.delete(refreshToken);
+    // Delete the old refresh token (rotation)
+    await this.prisma.refreshToken.delete({ where: { id: stored.id } });
 
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: '24h' }),
-      refresh_token: this.generateRefreshToken(user.id),
+      refresh_token: await this.generateRefreshToken(user.id),
       user: {
         id: user.id,
         email: user.email,
@@ -214,11 +220,32 @@ export class AuthService {
     };
   }
 
-  private generateRefreshToken(userId: string): string {
-    const token = crypto.randomBytes(48).toString('hex');
+  /**
+   * Generate a refresh token, store it in the database, and return the raw token.
+   * Database-backed storage ensures stateless operation across restarts and multi-instance deployments.
+   */
+  private async generateRefreshToken(userId: string): Promise<string> {
+    const rawToken = crypto.randomBytes(48).toString('hex');
+    const tokenHash = this.hashToken(rawToken);
     // Refresh token valid for 7 days
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    this.refreshTokens.set(token, { userId, expiresAt });
-    return token;
+
+    await this.prisma.refreshToken.create({
+      data: {
+        tokenHash,
+        userId,
+        expiresAt,
+      },
+    });
+
+    return rawToken;
+  }
+
+  /**
+   * Hash a token for secure storage. Uses SHA-256 since the token itself is already a cryptographically
+   * random string, so the hash is purely for defense-in-depth against DB leaks.
+   */
+  private hashToken(token: string): string {
+    return crypto.createHash('sha256').update(token).digest('hex');
   }
 }

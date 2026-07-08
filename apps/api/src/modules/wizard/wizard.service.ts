@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
+import { GamificationService } from '../gamification/gamification.service';
 
 // Wizard step definitions (matching shared enums)
 const WIZARD_STEPS = [
@@ -229,7 +230,6 @@ export class WizardService {
       _sum: { points: true },
     });
     const newTotal = totalXp._sum.points || 0;
-    const { GamificationService } = await import('../gamification/gamification.service');
     const levelInfo = GamificationService.calculateLevel(newTotal);
 
     await this.prisma.userLevel.upsert({

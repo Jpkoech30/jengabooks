@@ -122,12 +122,11 @@ export function HitlHub() {
 
       await api.post(`/hitl/${resolveTask.id}/resolve`, {
         resolution: resolutionText,
-        xpAwarded: 50,
         action: resolutionAction,
         correctedData,
       });
       setTasks((prev) => prev.map((t) => t.id === resolveTask.id ? { ...t, status: 'RESOLVED' } : t));
-      showToast('success', 'Task resolved', '+50 XP awarded');
+      showToast('success', 'Task resolved', 'Resolution submitted');
       setResolveTask(null);
     } catch (e: any) {
       showToast('error', 'Failed to resolve', e?.response?.data?.message || 'Please try again');

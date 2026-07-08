@@ -33,6 +33,8 @@ model Company {
   userLevels      UserLevel[]
   wizardProgress  WizardProgress[]
   auditLogs       AuditLog[]
+  statementUploads  StatementUpload[]
+  parsingTemplates  ParsingTemplate[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("companies")
@@ -64,7 +66,9 @@ model User {
   userLevels     UserLevel[]
   assignedReviews PendingReview[] @relation("AssignedReviews")
   resolvedReviews PendingReview[] @relation("ResolvedReviews")
-  auditLogs       AuditLog[]
+  statementUploads StatementUpload[]
+  auditLogs         AuditLog[]
+  refreshTokens     RefreshToken[]
   @@map("users")
 }
 
@@ -176,8 +180,12 @@ model MpesaTransaction {
   transactionDate DateTime
   description   String
   amount        Float
+  paidIn        Float?
+  withdrawn     Float?
   phoneNumber   String?
   paybill       String?
+  customerName  String?
+  transactionType String?
   rawCsv        String?
   mappedAccountId String?
   mappedAccount ChartOfAccount? @relation(fields: [mappedAccountId], references: [id])
@@ -329,6 +337,18 @@ model AuditLog {
   @@map("audit_logs")
 }
 
+model RefreshToken {
+  id        String   @id @default(uuid())
+  tokenHash String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
 model WizardProgress {
   id          String   @id @default(uuid())
   userId      String
@@ -341,4 +361,58 @@ model WizardProgress {
 
   @@unique([userId, companyId, step])
   @@map("wizard_progress")
+}
+
+model StatementUpload {
+  id                 String   @id @default(uuid())
+  tenantId           String
+  company            Company  @relation(fields: [tenantId], references: [id])
+  uploadedBy         String
+  user               User     @relation(fields: [uploadedBy], references: [id], onDelete: Cascade)
+  fileName           String
+  filePath           String
+  fileType           String
+  fileSize           Int
+  institution        String   @default("OTHER")
+  detectedBy         String   @default("AUTO")
+  statementPeriodStart DateTime?
+  statementPeriodEnd   DateTime?
+  accountNumber      String?
+  openingBalance     Float?
+  closingBalance     Float?
+  totalMoneyIn       Float?   @default(0)
+  totalMoneyOut      Float?   @default(0)
+  status             String   @default("PENDING_PARSING")
+  transactionCount   Int?     @default(0)
+  parsedData         Json?
+  errorMessage       String?
+  templateId         String?
+  template           ParsingTemplate? @relation(fields: [templateId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  processedAt        DateTime?
+
+  @@index([tenantId, status, createdAt])
+  @@map("statement_uploads")
+}
+
+model ParsingTemplate {
+  id              String   @id @default(uuid())
+  tenantId        String
+  company         Company  @relation(fields: [tenantId], references: [id])
+  name            String
+  institution     String
+  fileFormat      String
+  columnMapping   Json     @default("{}")
+  headerSignature String?
+  regexPatterns   Json     @default("[]")
+  isActive        Boolean  @default(true)
+  createdBy       String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  statementUploads StatementUpload[]
+
+  @@index([tenantId, institution])
+  @@map("parsing_templates")
 }

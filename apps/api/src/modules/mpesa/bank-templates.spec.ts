@@ -1,180 +1,173 @@
-/**
- * Bank CSV Template Detection Tests
- *
- * Kenyan bank statement formats:
- * - KCB: TransactionDate, ValueDate, Description, Debit, Credit, Balance
- * - Equity: Date, Description, Debit, Credit, Balance
- * - Co-operative: TransDate, Description, Debit, Credit, RunningBalance
- * - Standard Chartered: Date, Value Date, Description, Debit, Amount, Balance
- *
- * Edge cases:
- * - Auto-detect bank from header patterns
- * - Handle extra whitespace in headers
- * - Handle different date formats (DD/MM/YYYY, DD-MM-YYYY, YYYY-MM-DD)
- * - Handle header order variations
- * - Unknown format returns generic template
- */
+import { detectBankTemplate, normalizeRow, getTemplateById } from './bank-templates';
 
-type BankTemplate = {
-  bank: 'kcb' | 'equity' | 'coop' | 'stanchart' | 'generic';
-  name: string;
-  headerPatterns: RegExp[];
-  dateFormat: string;
-  columnMap: Record<string, string>;
-};
-
-const BANK_TEMPLATES: BankTemplate[] = [
-  // Most specific templates first (checked before generic ones)
-  {
-    bank: 'stanchart',
-    name: 'Standard Chartered',
-    headerPatterns: [/value date/i, /debit/i, /amount/i, /balance/i],
-    dateFormat: 'DD/MM/YYYY',
-    columnMap: {
-      date: 'transactionDate',
-      'value date': 'valueDate',
-      description: 'description',
-      debit: 'debit',
-      amount: 'credit',
-      balance: 'balance',
-    },
-  },
-  {
-    bank: 'coop',
-    name: 'Co-operative Bank',
-    headerPatterns: [/transdate/i, /runningbalance/i],
-    dateFormat: 'DD/MM/YYYY',
-    columnMap: {
-      transdate: 'transactionDate',
-      description: 'description',
-      debit: 'debit',
-      credit: 'credit',
-      runningbalance: 'balance',
-    },
-  },
-  {
-    bank: 'kcb',
-    name: 'KCB Bank',
-    headerPatterns: [/transactiondate/i, /valuedate/i, /debit/i, /credit/i],
-    dateFormat: 'DD/MM/YYYY',
-    columnMap: {
-      transactiondate: 'transactionDate',
-      valuedate: 'valueDate',
-      description: 'description',
-      debit: 'debit',
-      credit: 'credit',
-      balance: 'balance',
-    },
-  },
-  {
-    bank: 'equity',
-    name: 'Equity Bank',
-    headerPatterns: [/date/i, /description/i, /debit/i, /credit/i, /balance/i],
-    dateFormat: 'DD/MM/YYYY',
-    columnMap: {
-      date: 'transactionDate',
-      description: 'description',
-      debit: 'debit',
-      credit: 'credit',
-      balance: 'balance',
-    },
-  },
-];
-
-function detectBank(headers: string[]): BankTemplate {
-  const normalizedHeaders = headers.map(h => h.trim());
-
-  // Use first-match wins with specific patterns checked before generic ones
-  for (const template of BANK_TEMPLATES) {
-    const matchCount = template.headerPatterns.filter(pattern =>
-      normalizedHeaders.some(h => pattern.test(h))
-    ).length;
-
-    // Require 100% match for specific templates with few patterns
-    // Require 80% for templates with many patterns
-    const requiredRatio = template.headerPatterns.length <= 2 ? 1.0 : 0.8;
-    if (matchCount >= Math.ceil(template.headerPatterns.length * requiredRatio)) {
-      return template;
-    }
-  }
-
-  return {
-    bank: 'generic',
-    name: 'Generic CSV',
-    headerPatterns: [],
-    dateFormat: 'YYYY-MM-DD',
-    columnMap: {},
-  };
-}
-
-function normalizeHeader(header: string): string {
-  return header.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
-describe('Bank CSV Template Detection', () => {
-  describe('detectBank', () => {
-    it('should detect KCB format from headers', () => {
-      const headers = ['TransactionDate', 'ValueDate', 'Description', 'Debit', 'Credit', 'Balance'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('kcb');
-      expect(result.name).toBe('KCB Bank');
+describe('BankTemplates', () => {
+  describe('detectBankTemplate', () => {
+    it('should detect KCB template from KCB headers', () => {
+      const headers = ['Transaction Date', 'Value Date', 'Debit (KSH)', 'Credit (KSH)', 'Balance (KSH)', 'Details'];
+      const template = detectBankTemplate(headers);
+      expect(template).not.toBeNull();
+      expect(template!.id).toBe('kcb');
+      expect(template!.name).toBe('KCB Bank Statement');
     });
 
-    it('should detect Equity format from headers', () => {
-      const headers = ['Date', 'Description', 'Debit', 'Credit', 'Balance'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('equity');
+    it('should detect KCB with minimum required headers', () => {
+      const headers = ['Value Date', 'Balance (KSH)', 'Details'];
+      const template = detectBankTemplate(headers);
+      expect(template).not.toBeNull();
+      expect(template!.id).toBe('kcb');
     });
 
-    it('should detect Co-operative format from headers', () => {
-      const headers = ['TransDate', 'Description', 'Debit', 'Credit', 'RunningBalance'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('coop');
+    it('should detect Equity template from Equity headers', () => {
+      const headers = ['Date', 'Description', 'DR (KSH)', 'CR (KSH)', 'Amount (KSH)'];
+      const template = detectBankTemplate(headers);
+      expect(template).not.toBeNull();
+      expect(template!.id).toBe('equity');
     });
 
-    it('should detect Standard Chartered format from headers', () => {
-      const headers = ['Date', 'Value Date', 'Description', 'Debit', 'Amount', 'Balance'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('stanchart');
+    it('should detect Co-operative template from Co-op headers', () => {
+      const headers = ['Date', 'Ref No', 'Description', 'Debit (KSH)', 'Credit (KSH)', 'Branch'];
+      const template = detectBankTemplate(headers);
+      expect(template).not.toBeNull();
+      expect(template!.id).toBe('cooperative');
     });
 
-    it('should return generic for unknown headers', () => {
-      const headers = ['Name', 'Phone', 'Email', 'Amount'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('generic');
+    it('should detect M-Pesa template from M-Pesa headers', () => {
+      const headers = ['Receipt No', 'Transaction Date', 'Paid In', 'Withdrawn', 'Balance', 'Status'];
+      const template = detectBankTemplate(headers);
+      expect(template).not.toBeNull();
+      expect(template!.id).toBe('mpesa');
     });
 
-    it('should handle extra whitespace in headers', () => {
-      const headers = ['  TransactionDate  ', 'ValueDate', 'Description', 'Debit', 'Credit'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('kcb');
+    it('should return null for unrecognized headers', () => {
+      const headers = ['Column1', 'Column2', 'Column3'];
+      const template = detectBankTemplate(headers);
+      expect(template).toBeNull();
     });
 
-    it('should handle case-insensitive header matching', () => {
-      const headers = ['transactiondate', 'valuedate', 'description', 'debit', 'credit'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('kcb');
+    it('should return null for empty headers', () => {
+      const template = detectBankTemplate([]);
+      expect(template).toBeNull();
     });
 
-    it('should detect with full header match', () => {
-      // All KCB patterns present (needs 4/4 at 80% threshold)
-      const headers = ['TransactionDate', 'ValueDate', 'Description', 'Debit', 'Credit'];
-      const result = detectBank(headers);
-      expect(result.bank).toBe('kcb');
+    it('should match case-insensitively', () => {
+      const headers = ['transaction date', 'value date', 'balance (ksh)', 'details'];
+      const template = detectBankTemplate(headers);
+      expect(template).not.toBeNull();
+      expect(template!.id).toBe('kcb');
     });
   });
 
-  describe('normalizeHeader', () => {
-    it('should trim whitespace', () => {
-      expect(normalizeHeader('  Date  ')).toBe('date');
+  describe('normalizeRow with KCB template', () => {
+    const kcbTemplate = getTemplateById('kcb')!;
+
+    it('should normalize a KCB debit row', () => {
+      const rawRow = {
+        'transaction date': '2026-06-15',
+        'debit': '5,000.00',
+        'credit': '',
+        'balance': '50,000.00',
+        'details': 'POS Purchase',
+      };
+      const result = normalizeRow(kcbTemplate, rawRow);
+      expect(result.description).toBe('POS Purchase');
+      expect(result.amount).toBe(5000);
+      expect(result.paidIn).toBe(0);
+      expect(result.withdrawn).toBe(5000);
+      expect(result.transactionType).toBe('DEBIT');
+      expect(result.receiptNo).toBeNull();
     });
 
-    it('should lowercase', () => {
-      expect(normalizeHeader('TransactionDate')).toBe('transactiondate');
+    it('should normalize a KCB credit row', () => {
+      const rawRow = {
+        'transaction date': '2026-06-16',
+        'debit': '',
+        'credit': '10,000.00',
+        'balance': '60,000.00',
+        'details': 'Salary Deposit',
+      };
+      const result = normalizeRow(kcbTemplate, rawRow);
+      expect(result.description).toBe('Salary Deposit');
+      expect(result.amount).toBe(10000);
+      expect(result.paidIn).toBe(10000);
+      expect(result.withdrawn).toBe(0);
+      expect(result.transactionType).toBe('CREDIT');
     });
 
-    it('should normalize internal whitespace', () => {
-      expect(normalizeHeader('Value  Date')).toBe('value date');
+    it('should handle empty description', () => {
+      const rawRow = {
+        'transaction date': '2026-06-17',
+        'debit': '1,000.00',
+        'credit': '',
+        'balance': '59,000.00',
+        'details': '',
+      };
+      const result = normalizeRow(kcbTemplate, rawRow);
+      expect(result.description).toBe('');
+      expect(result.amount).toBe(1000);
+    });
+  });
+
+  describe('normalizeRow with Equity template', () => {
+    const equityTemplate = getTemplateById('equity')!;
+
+    it('should normalize an Equity row with DR/CR columns', () => {
+      const rawRow = {
+        'date': '2026-06-15',
+        'description': 'ATM Withdrawal',
+        'dr': '3,000.00',
+        'cr': '',
+      };
+      const result = normalizeRow(equityTemplate, rawRow);
+      expect(result.description).toBe('ATM Withdrawal');
+      expect(result.withdrawn).toBe(3000);
+      expect(result.paidIn).toBe(0);
+      expect(result.transactionType).toBe('DEBIT');
+    });
+
+    it('should handle single Amount column', () => {
+      const rawRow = {
+        'date': '2026-06-15',
+        'description': 'Deposit',
+        'amount': '15,000.00',
+      };
+      const result = normalizeRow(equityTemplate, rawRow);
+      expect(result.amount).toBe(15000);
+    });
+  });
+
+  describe('normalizeRow with M-Pesa template', () => {
+    const mpesaTemplate = getTemplateById('mpesa')!;
+
+    it('should normalize an M-Pesa row', () => {
+      const rawRow = {
+        'receiptno': 'RCT123',
+        'transactiondate': '2026-06-15',
+        'paidin': '2,000.00',
+        'withdrawn': '0',
+        'customer': 'John Doe',
+        'phonenumber': '0712345678',
+        'transactiontype': 'PAYBILL',
+      };
+      const result = normalizeRow(mpesaTemplate, rawRow);
+      expect(result.receiptNo).toBe('RCT123');
+      expect(result.paidIn).toBe(2000);
+      expect(result.withdrawn).toBe(0);
+      expect(result.customerName).toBe('John Doe');
+      expect(result.phoneNumber).toBe('0712345678');
+      expect(result.transactionType).toBe('PAYBILL');
+    });
+  });
+
+  describe('getTemplateById', () => {
+    it('should return KCB template by id', () => {
+      const template = getTemplateById('kcb');
+      expect(template).not.toBeUndefined();
+      expect(template!.id).toBe('kcb');
+    });
+
+    it('should return undefined for unknown id', () => {
+      const template = getTemplateById('unknown-bank');
+      expect(template).toBeUndefined();
     });
   });
 });

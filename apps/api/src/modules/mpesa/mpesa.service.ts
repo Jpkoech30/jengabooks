@@ -3,6 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { HitlService } from '../hitl/hitl.service';
 import { ReconciliationAgent } from '../ai/agents/reconciliation.agent';
+import { detectBankTemplate, normalizeRow } from './bank-templates';
 
 @Injectable()
 export class MpesaService {
@@ -23,6 +24,14 @@ export class MpesaService {
     }
 
     const headers = lines[0].split(',').map((h) => h.trim().toLowerCase());
+    const rawHeaders = lines[0].split(',').map((h) => h.trim());
+
+    // Try to detect bank template from headers
+    const bankTemplate = detectBankTemplate(headers);
+    if (bankTemplate) {
+      this.logger.log(`Detected bank template: ${bankTemplate.name} (${bankTemplate.id})`);
+    }
+
     const parsedRows = [];
 
     for (let i = 1; i < lines.length; i++) {
@@ -34,16 +43,31 @@ export class MpesaService {
         row[header] = values[idx];
       });
 
-      parsedRows.push({
-        companyId,
-        receiptNo: row['receipt'] || row['receiptno'] || row['transaction id'] || null,
-        transactionDate: new Date(row['date'] || row['transactiondate'] || row['time'] || Date.now()),
-        description: row['description'] || row['details'] || row['notes'] || '',
-        amount: parseFloat(row['amount'] || row['value'] || '0'),
-        phoneNumber: row['phone'] || row['phonenumber'] || row['sender'] || null,
-        paybill: row['paybill'] || row['business'] || row['till'] || null,
-        rawCsv: JSON.stringify(row),
-      });
+      if (bankTemplate) {
+        // Use bank template to normalize columns
+        const normalized = normalizeRow(bankTemplate, row);
+        parsedRows.push({
+          companyId,
+          ...normalized,
+          rawCsv: JSON.stringify(row),
+        });
+      } else {
+        // Fall back to alias-based parsing
+        parsedRows.push({
+          companyId,
+          receiptNo: row['receipt'] || row['receiptno'] || row['transaction id'] || null,
+          transactionDate: new Date(row['date'] || row['transactiondate'] || row['time'] || Date.now()),
+          description: row['description'] || row['details'] || row['notes'] || '',
+          amount: parseFloat(row['amount'] || row['value'] || '0'),
+          paidIn: parseFloat(row['paid in'] || row['paidin'] || '0') || 0,
+          withdrawn: parseFloat(row['withdrawn'] || '0') || 0,
+          phoneNumber: row['phone'] || row['phonenumber'] || row['sender'] || null,
+          paybill: row['paybill'] || row['business'] || row['till'] || null,
+          customerName: row['customer name'] || row['customer'] || undefined,
+          transactionType: row['transaction type'] || row['transactiontype'] || undefined,
+          rawCsv: JSON.stringify(row),
+        });
+      }
     }
 
     if (parsedRows.length === 0) {
@@ -115,8 +139,12 @@ export class MpesaService {
       transactionDate: tx.transactionDate,
       description: tx.description,
       amount: tx.amount,
+      paidIn: tx.paidIn || 0,
+      withdrawn: tx.withdrawn || 0,
       phoneNumber: tx.phoneNumber || null,
       paybill: tx.paybill || null,
+      customerName: tx.customerName || null,
+      transactionType: tx.transactionType || null,
       rawCsv: JSON.stringify({ source, ...tx }),
     }));
 
@@ -147,6 +175,18 @@ export class MpesaService {
 
   async deleteTransactions(companyId: string, receiptNos: string[]) {
     if (receiptNos.length === 0) return { deleted: 0 };
+    // Fetch IDs of transactions being deleted (needed for HITL cascade)
+    const toDelete = await this.prisma.mpesaTransaction.findMany({
+      where: { companyId, receiptNo: { in: receiptNos } },
+      select: { id: true },
+    });
+    const ids = toDelete.map(t => t.id);
+    // Cascade-delete associated HITL pending reviews
+    if (ids.length > 0) {
+      await this.prisma.pendingReview.deleteMany({
+        where: { companyId, linkedEntityType: 'MPESA_TX', linkedEntityId: { in: ids } },
+      });
+    }
     const result = await this.prisma.mpesaTransaction.deleteMany({
       where: { companyId, receiptNo: { in: receiptNos } },
     });
@@ -154,6 +194,10 @@ export class MpesaService {
   }
 
   async deleteAllTransactions(companyId: string) {
+    // Cascade-delete associated HITL pending reviews first
+    await this.prisma.pendingReview.deleteMany({
+      where: { companyId, linkedEntityType: 'MPESA_TX' },
+    });
     const result = await this.prisma.mpesaTransaction.deleteMany({
       where: { companyId },
     });
