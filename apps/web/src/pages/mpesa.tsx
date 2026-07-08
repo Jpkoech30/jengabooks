@@ -56,13 +56,19 @@ export function MpesaImport() {
   const [importing, setImporting] = React.useState(false);
   const [result, setResult] = React.useState<{ imported: number; categorized: number; message: string } | null>(null);
   const [error, setError] = React.useState<string | null>(null);
+  const [page, setPage] = React.useState(1);
+  const [total, setTotal] = React.useState(0);
+  const [totalPages, setTotalPages] = React.useState(1);
+  const PAGE_LIMIT = 25;
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const loadTransactions = async () => {
+  const loadTransactions = async (pageNum: number = 1) => {
     setLoading(true);
     try {
-      const data = await api.get<{ items: MpesaTx[]; total: number }>('/mpesa');
+      const data = await api.get<{ items: MpesaTx[]; total: number; totalPages?: number; page?: number }>('/mpesa', { page: pageNum, limit: PAGE_LIMIT });
       setTransactions(data.items);
+      setTotal(data.total);
+      setTotalPages(data.totalPages || Math.ceil(data.total / PAGE_LIMIT));
     } catch { /* ignore */ } finally { setLoading(false); }
   };
 
@@ -74,9 +80,10 @@ export function MpesaImport() {
   };
 
   React.useEffect(() => {
-    loadTransactions();
+    loadTransactions(page);
     loadAccounts();
-  }, [refreshKey]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refreshKey, page]);
 
   const handleFileUpload = async (file: File) => {
     if (!file) return;
@@ -99,7 +106,8 @@ export function MpesaImport() {
         });
         setResult(data);
       }
-      loadTransactions();
+      setPage(1);
+      loadTransactions(1);
     } catch (err: any) {
       setError(err?.response?.data?.message || 'Failed to import file');
     } finally {
@@ -149,11 +157,11 @@ export function MpesaImport() {
     >
 
       {/* Summary Stats */}
-      {transactions.length > 0 && (
+      {total > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="rounded-xl border border-kenya-green-100 p-3 bg-white dark:bg-kenya-surface-dark">
             <p className="text-xs text-gray-500">Total Transactions</p>
-            <p className="text-lg font-bold text-kenya-green-700">{transactions.length}</p>
+            <p className="text-lg font-bold text-kenya-green-700">{total}</p>
           </div>
           <div className="rounded-xl border border-kenya-green-100 p-3 bg-white dark:bg-kenya-surface-dark">
             <p className="text-xs text-gray-500">Total Paid In</p>
@@ -200,7 +208,7 @@ export function MpesaImport() {
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between w-full">
-            <CardTitle>Transactions ({transactions.length})</CardTitle>
+            <CardTitle>Transactions ({total})</CardTitle>
             {transactions.length > 0 && (
               <Button variant="destructive" size="sm" onClick={() => setDeleteConfirm({ open: true, type: 'all' })}>
                 Delete All
@@ -300,6 +308,21 @@ export function MpesaImport() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-center gap-2 mt-4">
+                <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => setPage(page - 1)}>
+                  Previous
+                </Button>
+                <span className="text-sm text-gray-500">
+                  Page {page} of {totalPages}
+                </span>
+                <Button variant="ghost" size="sm" disabled={page >= totalPages} onClick={() => setPage(page + 1)}>
+                  Next
+                </Button>
+              </div>
+            )}
           </PageState>
         </CardContent>
       </Card>
