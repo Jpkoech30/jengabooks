@@ -4,8 +4,11 @@ import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { PageShell } from '../components/layout/page-shell';
+import { Skeleton } from '../components/ui/skeleton';
+import { EmptyState } from '../components/ui/empty-state';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
+import { formatKES } from '../lib/utils';
 
 interface ReportTemplate {
   id: string;
@@ -79,7 +82,8 @@ const categories: ReportCategory[] = [
   },
 ];
 
-const allReports = categories.flatMap((c) => c.reports);
+// Only reports with endpoints are available
+const allReports = categories.flatMap((c) => c.reports.filter((r) => r.endpoint));
 
 const hashToKey: Record<string, string> = {
   financial: 'financial',
@@ -95,6 +99,141 @@ const QUICK_RANGES: Array<{ label: string; start: () => Date; end?: () => Date }
   { label: 'This Year', start: () => new Date(new Date().getFullYear(), 0, 1) },
 ];
 
+// ─── Color-coded metric preview card ──────────────────────────────────
+
+const cardGradients: Record<string, string> = {
+  revenue: 'from-green-50 to-emerald-50/50 dark:from-green-900/10 dark:to-emerald-900/5 border-green-200 dark:border-green-800',
+  expense: 'from-red-50 to-rose-50/50 dark:from-red-900/10 dark:to-rose-900/5 border-red-200 dark:border-red-800',
+  net: 'from-blue-50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/5 border-blue-200 dark:border-blue-800',
+  asset: 'from-sky-50 to-blue-50/50 dark:from-sky-900/10 dark:to-blue-900/5 border-sky-200 dark:border-sky-800',
+  liability: 'from-amber-50 to-yellow-50/50 dark:from-amber-900/10 dark:to-yellow-900/5 border-amber-200 dark:border-amber-800',
+  equity: 'from-purple-50 to-violet-50/50 dark:from-purple-900/10 dark:to-violet-900/5 border-purple-200 dark:border-purple-800',
+  audit: 'from-gray-50 to-slate-50/50 dark:from-gray-800 dark:to-slate-800 border-gray-200 dark:border-gray-700',
+};
+
+function MetricBadge({ label, value, gradient, bold }: { label: string; value: number; gradient?: string; bold?: boolean }) {
+  return (
+    <div className={`rounded-lg border p-3 ${gradient ?? ''}`}>
+      <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">{label}</p>
+      <p className={`text-sm font-mono mt-0.5 ${bold ? 'font-bold text-gray-900 dark:text-white' : 'font-semibold text-gray-800 dark:text-gray-200'}`}>
+        {formatKES(value)}
+      </p>
+    </div>
+  );
+}
+
+function ReportPreviewCard({ result, template }: { result: any; template: ReportTemplate }) {
+  // Detect if result has no meaningful data
+  const hasNoData =
+    !result ||
+    Object.keys(result).length === 0 ||
+    (result.totalIncome === 0 && result.totalExpenses === 0 && result.netIncome === 0) ||
+    (result.totalAssets === 0 && result.totalLiabilities === 0 && result.totalEquity === 0) ||
+    (result.items && result.items.length === 0);
+
+  if (hasNoData) {
+    return (
+      <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/50 dark:bg-gray-800/30 p-6 text-center">
+        <p className="text-2xl mb-2">📭</p>
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-400">No data found for this period</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Try adjusting the date range or check if transactions exist.</p>
+      </div>
+    );
+  }
+
+  // ── Profit & Loss ──────────────────────────────────────────────
+  if (result.totalIncome !== undefined) {
+    return (
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">📊 {template.name}</h4>
+        <div className="grid grid-cols-3 gap-2">
+          <MetricBadge label="Revenue" value={result.totalIncome} gradient={cardGradients.revenue} />
+          <MetricBadge label="Expenses" value={result.totalExpenses} gradient={cardGradients.expense} />
+          <MetricBadge label="Net Income" value={result.netIncome} gradient={cardGradients.net} bold />
+        </div>
+      </div>
+    );
+  }
+
+  // ── Balance Sheet ──────────────────────────────────────────────
+  if (result.totalAssets !== undefined) {
+    return (
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">⚖️ {template.name}</h4>
+        <div className="grid grid-cols-3 gap-2">
+          <MetricBadge label="Assets" value={result.totalAssets} gradient={cardGradients.asset} />
+          <MetricBadge label="Liabilities" value={result.totalLiabilities} gradient={cardGradients.liability} />
+          <MetricBadge label="Equity" value={result.totalEquity} gradient={cardGradients.equity} />
+        </div>
+        <p className={`text-xs font-medium mt-1 ${result.balanced ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          {result.balanced ? '✅ Balanced' : '❌ Unbalanced'}
+        </p>
+      </div>
+    );
+  }
+
+  // ── Trial Balance ──────────────────────────────────────────────
+  if (result.totalDebits !== undefined) {
+    return (
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">📋 {template.name}</h4>
+        <div className="grid grid-cols-2 gap-2">
+          <MetricBadge label="Total Debits" value={result.totalDebits} gradient={cardGradients.audit} />
+          <MetricBadge label="Total Credits" value={result.totalCredits} gradient={cardGradients.audit} />
+        </div>
+        <p className={`text-xs font-medium mt-1 ${result.balanced ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+          {result.balanced ? '✅ Balanced' : '❌ Unbalanced'}
+        </p>
+      </div>
+    );
+  }
+
+  // ── Audit Trail ────────────────────────────────────────────────
+  if (result.items && Array.isArray(result.items)) {
+    return (
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">🔍 {template.name}</h4>
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 p-3">
+          <p className="text-sm font-semibold text-gray-800 dark:text-gray-200">{result.total || result.items.length} records found</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+            Showing {result.items.length > 5 ? 'latest 5' : result.items.length} entries
+          </p>
+          <div className="mt-2 space-y-1 max-h-[200px] overflow-y-auto">
+            {result.items.slice(0, 5).map((item: any) => (
+              <div key={item.id} className="flex items-center gap-2 p-1.5 rounded text-xs">
+                <span>{item.action === 'LOGIN' ? '🔐' : item.action === 'CREATE_ENTRY' ? '📝' : '⚙️'}</span>
+                <span className="text-gray-600 dark:text-gray-300 truncate flex-1">
+                  {item.action?.replace(/_/g, ' ')}
+                </span>
+                <span className="text-gray-400 shrink-0">{new Date(item.createdAt).toLocaleDateString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Fallback: show whatever Row-compatible data exists ─────────
+  const scalarFields = Object.keys(result).filter(
+    (k) => typeof result[k] === 'number' && !Array.isArray(result[k]),
+  );
+  if (scalarFields.length > 0) {
+    return (
+      <div className="space-y-2">
+        <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{template.icon} {template.name}</h4>
+        <div className="space-y-1">
+          {scalarFields.map((key) => (
+            <Row key={key} label={key.replace(/([A-Z])/g, ' $1').replace(/^./, (s) => s.toUpperCase())} value={result[key]} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
 export function Reports() {
   const { category } = useParams<{ category?: string }>();
   const navigate = useNavigate();
@@ -103,11 +242,16 @@ export function Reports() {
   const [dateFrom, setDateFrom] = React.useState('');
   const [dateTo, setDateTo] = React.useState('');
   const [generating, setGenerating] = React.useState(false);
+  const [downloadBusy, setDownloadBusy] = React.useState(false);
   const [lastResult, setLastResult] = React.useState<any>(null);
 
   const activeCategory = category && hashToKey[category] ? category : null;
   const selectedTemplate = selectedReport ? allReports.find((r) => r.id === selectedReport) : null;
   const activeCat = activeCategory ? categories.find((c) => c.key === activeCategory) : null;
+
+  // Only show reports with endpoints
+  const workingReports = activeCat ? activeCat.reports.filter((r) => r.endpoint) : [];
+  const readyCount = workingReports.length;
 
   // Scroll to config when a report is selected
   React.useEffect(() => {
@@ -118,15 +262,20 @@ export function Reports() {
     }
   }, [selectedReport]);
 
+  const buildParams = () => {
+    const params: Record<string, string> = {};
+    if (dateFrom) params.from = new Date(dateFrom).toISOString();
+    if (dateTo) params.to = new Date(dateTo).toISOString();
+    if (selectedTemplate && (selectedTemplate.id === '2' || selectedTemplate.id === '4')) params.asOf = dateTo || new Date().toISOString();
+    return params;
+  };
+
   const handleGenerate = async () => {
     if (!selectedReport || !selectedTemplate?.endpoint) return;
     setGenerating(true);
     setLastResult(null);
     try {
-      const params: Record<string, string> = {};
-      if (dateFrom) params.from = new Date(dateFrom).toISOString();
-      if (dateTo) params.to = new Date(dateTo).toISOString();
-      if (selectedTemplate.id === '2' || selectedTemplate.id === '4') params.asOf = dateTo || new Date().toISOString();
+      const params = buildParams();
       const result = await api.get<any>(selectedTemplate.endpoint, params);
       setLastResult(result);
       showToast('success', 'Report generated', `${selectedTemplate.name} generated successfully`);
@@ -137,42 +286,56 @@ export function Reports() {
     }
   };
 
-  const handleDownloadCsv = () => {
-    if (!lastResult) return;
-    const rows: string[] = [];
+  const handleGenerateAndDownload = async () => {
+    if (!selectedReport || !selectedTemplate?.endpoint) return;
+    setDownloadBusy(true);
+    try {
+      const params = buildParams();
+      const result = await api.get<any>(selectedTemplate.endpoint, params);
+      setLastResult(result);
 
-    // Handle array data (income, expenses, accounts)
-    const arrayFields = ['income', 'expenses', 'assets', 'liabilities', 'equity', 'accounts'];
-    for (const field of arrayFields) {
-      if (Array.isArray(lastResult[field]) && lastResult[field].length > 0) {
-        const items = lastResult[field];
-        rows.push(`"${field.toUpperCase()}"`);
-        const itemKeys = Object.keys(items[0]);
-        rows.push(itemKeys.map((k) => `"${k}"`).join(','));
-        for (const item of items) {
-          rows.push(itemKeys.map((k) => `"${item[k] ?? ''}"`).join(','));
+      // Build CSV and trigger download immediately
+      const rows: string[] = [];
+      const arrayFields = ['income', 'expenses', 'assets', 'liabilities', 'equity', 'accounts', 'items'];
+      for (const field of arrayFields) {
+        if (Array.isArray(result[field]) && result[field].length > 0) {
+          const items = result[field];
+          rows.push(`"${field.toUpperCase()}"`);
+          const itemKeys = Object.keys(items[0]);
+          rows.push(itemKeys.map((k) => `"${k}"`).join(','));
+          for (const item of items) {
+            rows.push(itemKeys.map((k) => `"${item[k] ?? ''}"`).join(','));
+          }
+          rows.push('');
         }
-        rows.push('');
       }
-    }
+      const scalarFields = Object.keys(result).filter(
+        (k) => !arrayFields.includes(k) && typeof result[k] !== 'object',
+      );
+      if (scalarFields.length > 0) {
+        rows.push('"SUMMARY"');
+        rows.push(scalarFields.map((k) => `"${k}"`).join(','));
+        rows.push(scalarFields.map((k) => `"${String(result[k] ?? '')}"`).join(','));
+      }
 
-    // Handle scalar fields (totals, metadata)
-    const scalarFields = Object.keys(lastResult).filter(
-      (k) => !arrayFields.includes(k) && typeof lastResult[k] !== 'object',
-    );
-    if (scalarFields.length > 0) {
-      rows.push('"SUMMARY"');
-      rows.push(scalarFields.map((k) => `"${k}"`).join(','));
-      rows.push(scalarFields.map((k) => `"${String(lastResult[k] ?? '')}"`).join(','));
-    }
+      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `report-${selectedReport}-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
 
-    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report-${selectedReport}-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+      showToast('success', 'Downloaded', `${selectedTemplate.name} generated and downloaded`);
+    } catch (e: any) {
+      showToast('error', 'Failed', e?.response?.data?.message || 'Could not generate report');
+    } finally {
+      setDownloadBusy(false);
+    }
+  };
+
+  const handleRetry = () => {
+    handleGenerate();
   };
 
   const applyQuickRange = (range: typeof QUICK_RANGES[number]) => {
@@ -182,11 +345,36 @@ export function Reports() {
     setDateTo(end.toISOString().split('T')[0] ?? '');
   };
 
-  const readyCount = activeCat ? activeCat.reports.filter(r => r.endpoint).length : 0;
-  const totalCount = activeCat ? activeCat.reports.length : 0;
+  const hasEmptyResult =
+    lastResult &&
+    (Object.keys(lastResult).length === 0 ||
+      (lastResult.totalIncome === 0 && lastResult.totalExpenses === 0 && lastResult.netIncome === 0) ||
+      (lastResult.totalAssets === 0 && lastResult.totalLiabilities === 0 && lastResult.totalEquity === 0) ||
+      (lastResult.items && lastResult.items.length === 0));
 
   // ─── FILTERED VIEW: Single Section ──────────────────────────────────
   if (activeCat) {
+    // Edge case: category has no reports with endpoints
+    if (workingReports.length === 0) {
+      return (
+        <div className="flex flex-col gap-6">
+          <nav className="flex items-center gap-2 text-sm">
+            <button onClick={() => navigate('/reports')} className="text-gray-500 hover:text-kenya-green-600 dark:text-gray-400 dark:hover:text-kenya-green-400 transition-colors">
+              Reports
+            </button>
+            <span className="text-gray-300 dark:text-gray-600">/</span>
+            <span className="font-medium text-kenya-green-900 dark:text-kenya-green-50">{activeCat.title}</span>
+          </nav>
+          <EmptyState
+            icon={activeCat.icon}
+            title="No ready reports yet"
+            description={`Reports in ${activeCat.title} are still being built. Check back soon or browse other report categories.`}
+            action={{ label: '← Browse all reports', onClick: () => navigate('/reports') }}
+          />
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col gap-6">
         {/* Breadcrumb */}
@@ -206,27 +394,25 @@ export function Reports() {
               <h1 className="text-xl font-bold">{activeCat.title}</h1>
               <p className="text-sm text-kenya-green-100 mt-1 max-w-xl">{activeCat.description}</p>
               <p className="text-xs text-kenya-green-200 mt-2">
-                {readyCount} ready · {totalCount - readyCount} coming soon
+                {readyCount} report{readyCount !== 1 ? 's' : ''} available
               </p>
             </div>
             <span className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-white/10 text-xs font-medium">
-              {readyCount}/{totalCount} reports
+              {readyCount} ready
             </span>
           </div>
         </div>
 
-        {/* Report Cards */}
+        {/* Report Cards — only working reports with endpoints */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {activeCat.reports.map((r) => (
+          {workingReports.map((r) => (
             <button
               key={r.id}
               onClick={() => { setSelectedReport(r.id); setLastResult(null); }}
               className={`touch-target flex items-start gap-4 rounded-xl border-2 p-5 text-left transition-all ${
                 selectedReport === r.id
                   ? 'border-kenya-green-500 bg-kenya-green-50 dark:bg-kenya-green-900/20 shadow-md ring-2 ring-kenya-green-500/20'
-                  : r.endpoint
-                    ? 'border-gray-200 dark:border-gray-700 hover:border-kenya-green-300 hover:shadow-sm'
-                    : 'border-gray-100 dark:border-gray-800 opacity-70'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-kenya-green-300 hover:shadow-sm'
               }`}
             >
               <span className="text-3xl">{r.icon}</span>
@@ -240,10 +426,8 @@ export function Reports() {
                   )}
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">{r.description}</p>
-                <span className={`text-xs mt-2 inline-block font-medium ${
-                  r.endpoint ? 'text-kenya-green-600 dark:text-kenya-green-400' : 'text-kenya-amber-500'
-                }`}>
-                  {r.endpoint ? '✓ Ready to generate' : '⚡ Coming soon'}
+                <span className="text-xs mt-2 inline-block font-medium text-kenya-green-600 dark:text-kenya-green-400">
+                  ✓ Ready to generate
                 </span>
               </div>
               {selectedReport === r.id && (
@@ -280,30 +464,48 @@ export function Reports() {
                         </button>
                       ))}
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
+                    {/* Improved custom date alignment */}
+                    <div className="flex items-end gap-3">
+                      <div className="flex-1">
                         <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">From</label>
                         <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
                       </div>
-                      <div>
+                      <span className="text-gray-300 dark:text-gray-600 pb-2 text-sm">—</span>
+                      <div className="flex-1">
                         <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">To</label>
                         <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
                       </div>
                     </div>
                   </div>
-                  <Button onClick={handleGenerate} size="lg" disabled={generating || !selectedTemplate.endpoint}
-                    className={selectedTemplate.endpoint ? '' : 'opacity-50'}>
-                    {generating ? (
-                      <span className="flex items-center gap-2">⏳ Generating...</span>
-                    ) : (
-                      <span className="flex items-center gap-2">📥 Generate Report</span>
-                    )}
-                  </Button>
-                  {!selectedTemplate.endpoint && (
-                    <p className="text-xs text-kenya-amber-500 text-center flex items-center justify-center gap-1">
-                      <span>⚡</span> Coming soon — backend integration in progress
-                    </p>
-                  )}
+
+                  {/* Two-button action row: Preview + Generate & Download */}
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleGenerate}
+                      size="md"
+                      disabled={generating || downloadBusy}
+                      className="flex-1"
+                      variant="secondary"
+                    >
+                      {generating ? (
+                        <span className="flex items-center gap-2">⏳ Previewing...</span>
+                      ) : (
+                        <span className="flex items-center gap-2">👁️ Preview</span>
+                      )}
+                    </Button>
+                    <Button
+                      onClick={handleGenerateAndDownload}
+                      size="md"
+                      disabled={generating || downloadBusy}
+                      className="flex-1"
+                    >
+                      {downloadBusy ? (
+                        <span className="flex items-center gap-2">⏳ Downloading...</span>
+                      ) : (
+                        <span className="flex items-center gap-2">📥 Generate & Download</span>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -312,78 +514,82 @@ export function Reports() {
               <CardContent className="p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">Result</h3>
-                  {lastResult && (
+                  {lastResult && !hasEmptyResult && (
                     <span className="text-[10px] text-gray-400">
                       Generated {new Date(lastResult.generatedAt || Date.now()).toLocaleTimeString()}
                     </span>
                   )}
                 </div>
-                {generating ? (
-                  <div className="space-y-3 animate-pulse py-6">
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-1/2" />
-                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-2/3" />
+
+                {/* Loading skeleton */}
+                {generating || downloadBusy ? (
+                  <div className="space-y-3 py-4">
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-4 w-3/5" />
+                  </div>
+                ) : lastResult && hasEmptyResult ? (
+                  /* Empty data state */
+                  <div className="py-6 text-center">
+                    <p className="text-3xl mb-2">📭</p>
+                    <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">No data found for this period</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">Try adjusting the date range to see results.</p>
+                    <Button variant="secondary" size="sm" onClick={() => { setLastResult(null); }}>
+                      Adjust Date Range
+                    </Button>
                   </div>
                 ) : lastResult ? (
-                  <div className="space-y-2">
-                    {/* Audit Trail results */}
-                    {lastResult.items && (
-                      <div className="space-y-2">
-                        <p className="text-xs text-gray-500 mb-2">{lastResult.total} records found</p>
-                        <div className="max-h-[400px] overflow-y-auto space-y-1">
-                          {lastResult.items.map((item: any) => (
-                            <div key={item.id} className="flex items-center gap-3 p-2.5 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-sm">
-                              <span className="text-lg shrink-0">{item.action === 'LOGIN' ? '🔐' : item.action === 'CREATE_ENTRY' ? '📝' : '⚙️'}</span>
-                              <div className="flex-1 min-w-0">
-                                <p className="font-medium text-gray-800 dark:text-gray-200 truncate">{item.action?.replace(/_/g, ' ')}</p>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                  {item.user?.name || 'System'} · {item.entityType?.replace(/_/g, ' ')}
-                                </p>
-                              </div>
-                              <span className="text-xs text-gray-400 shrink-0">
-                                {new Date(item.createdAt).toLocaleDateString()}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Financial report results */}
-                    {lastResult.totalIncome !== undefined && (
-                      <>
-                        <Row label="Revenue" value={lastResult.totalIncome} />
-                        <Row label="Expenses" value={lastResult.totalExpenses} />
-                        <Row label="Net Income" value={lastResult.netIncome} bold />
-                      </>
-                    )}
-                    {lastResult.totalAssets !== undefined && (
-                      <>
-                        <Row label="Assets" value={lastResult.totalAssets} />
-                        <Row label="Liabilities" value={lastResult.totalLiabilities} />
-                        <Row label="Equity" value={lastResult.totalEquity} />
-                        <p className={`text-xs font-medium ${lastResult.balanced ? 'text-green-600' : 'text-red-600'}`}>
-                          {lastResult.balanced ? '✅ Balanced' : '❌ Unbalanced'}
-                        </p>
-                      </>
-                    )}
-                    {lastResult.totalDebits !== undefined && (
-                      <>
-                        <Row label="Debits" value={lastResult.totalDebits} />
-                        <Row label="Credits" value={lastResult.totalCredits} />
-                        <p className={`text-xs font-medium ${lastResult.balanced ? 'text-green-600' : 'text-red-600'}`}>
-                          {lastResult.balanced ? '✅ Balanced' : '❌ Unbalanced'}
-                        </p>
-                      </>
-                    )}
-                    <Button variant="ghost" size="sm" onClick={handleDownloadCsv} className="w-full mt-3">
+                  /* Report preview card */
+                  <div className="space-y-3">
+                    <ReportPreviewCard result={lastResult} template={selectedTemplate} />
+                    <Button variant="ghost" size="sm" onClick={() => {
+                      // Reuse the download logic inline
+                      const rows: string[] = [];
+                      const arrayFields = ['income', 'expenses', 'assets', 'liabilities', 'equity', 'accounts', 'items'];
+                      for (const field of arrayFields) {
+                        if (Array.isArray(lastResult[field]) && lastResult[field].length > 0) {
+                          const items = lastResult[field];
+                          rows.push(`"${field.toUpperCase()}"`);
+                          const itemKeys = Object.keys(items[0]);
+                          rows.push(itemKeys.map((k) => `"${k}"`).join(','));
+                          for (const item of items) {
+                            rows.push(itemKeys.map((k) => `"${item[k] ?? ''}"`).join(','));
+                          }
+                          rows.push('');
+                        }
+                      }
+                      const scalarFields = Object.keys(lastResult).filter(
+                        (k) => !arrayFields.includes(k) && typeof lastResult[k] !== 'object',
+                      );
+                      if (scalarFields.length > 0) {
+                        rows.push('"SUMMARY"');
+                        rows.push(scalarFields.map((k) => `"${k}"`).join(','));
+                        rows.push(scalarFields.map((k) => `"${String(lastResult[k] ?? '')}"`).join(','));
+                      }
+                      const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `report-${selectedReport}-${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }} className="w-full mt-2">
                       📥 Download CSV
                     </Button>
                   </div>
                 ) : (
+                  /* Initial idle state */
                   <div className="py-10 text-center text-gray-400">
                     <p className="text-3xl mb-2">📄</p>
                     <p className="text-sm">Configure date range and generate</p>
+                  </div>
+                )}
+
+                {/* Error retry — only show when there's an error (detected by lastResult being null but no generation happening) */}
+                {!generating && !downloadBusy && !lastResult && selectedReport && (
+                  <div className="mt-2 text-center">
+                    <p className="text-xs text-gray-400 dark:text-gray-500">Click <strong>Preview</strong> or <strong>Generate & Download</strong> above to run this report.</p>
                   </div>
                 )}
               </CardContent>
@@ -400,7 +606,6 @@ export function Reports() {
       title="Reports"
       subtitle="Select a category to view and generate reports"
     >
-
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {categories.map((cat) => {
           const catReadyCount = cat.reports.filter(r => r.endpoint).length;
