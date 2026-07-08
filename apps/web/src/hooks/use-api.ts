@@ -181,3 +181,67 @@ export function useTeamMembers(companyId?: string) {
     enabled: !!companyId,
   });
 }
+
+// ─── Payroll ──────────────────────────────────────────────────────────────
+
+export interface PayrollRun {
+  id: string;
+  period: string;
+  status: string;
+  totalEmployees: number;
+  grossPay: number;
+  netPay: number;
+  paye: number;
+  entries?: PayrollEntry[];
+  createdAt: string;
+}
+
+export interface PayrollEntry {
+  id: string;
+  employeeName: string;
+  kraPin?: string | null;
+  department?: string | null;
+  basicSalary: number;
+  housingAllowance: number;
+  paye: number;
+  nhif: number;
+  nssf: number;
+  housingLevy: number;
+  grossPay: number;
+  netPay: number;
+}
+
+export interface PayrollRunsResponse {
+  items: PayrollRun[];
+  total: number;
+}
+
+export interface CalculatePayResponse {
+  paye: number;
+  nhif: number;
+  nssf: number;
+  housingLevy: number;
+  grossPay: number;
+  netPay: number;
+}
+
+export function usePayrollRuns() {
+  return useQuery<PayrollRunsResponse>({
+    queryKey: ['payroll-runs'],
+    queryFn: () => api.get('/payroll/runs'),
+  });
+}
+
+export function usePayrollRun(id: string | null) {
+  return useQuery<PayrollRun>({
+    queryKey: ['payroll-run', id],
+    queryFn: () => api.get(`/payroll/runs/${id}`),
+    enabled: !!id,
+  });
+}
+
+export function useCalculatePay() {
+  return useMutation<CalculatePayResponse, Error, { basicSalary: number; housingAllowance: number }>({
+    mutationFn: (data) => api.post('/payroll/calculate', data),
+  });
+}
