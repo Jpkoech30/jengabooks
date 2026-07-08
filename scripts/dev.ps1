@@ -44,6 +44,31 @@ $JengaRoot = Split-Path -Parent $PSScriptRoot
 $isWindows = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
 $isWsl = $isWindows -and (-not $SkipWsl)
 
+# ==============================================================================
+# PRE-FLIGHT: Kill stale dev server processes from previous runs
+# ==============================================================================
+Write-Host "[PRE-FLIGHT] Cleaning up stale processes..." -ForegroundColor Cyan
+$stalePorts = @(3001, 5173)
+$staleProcs = @()
+foreach ($port in $stalePorts) {
+    $found = netstat -ano | Select-String ":$port\s+.*LISTENING"
+    foreach ($match in $found) {
+        $pid = $match.ToString().Trim().Split()[-1]
+        if ($pid -and $pid -ne "0") {
+            $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+            if ($proc -and $proc.ProcessName -match "node|npm") {
+                $staleProcs += $pid
+                Write-Host "  -> Killing stale process on port $port (PID: $pid, $($proc.ProcessName))" -ForegroundColor Yellow
+                Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            }
+        }
+    }
+}
+if ($staleProcs.Count -eq 0) {
+    Write-Host "  -> No stale processes found" -ForegroundColor Green
+}
+Write-Host ""
+
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "   JengaBooks - Dev Environment" -ForegroundColor Green
