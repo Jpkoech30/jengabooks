@@ -142,7 +142,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
         <div>
           <h1 className="text-lg font-bold leading-tight">JengaBooks</h1>
-          <p className="text-xs text-kenya-green-200">
+          <p className="text-xs text-kenya-green-100">
             {viewMode === 'client' && activeClient
               ? activeClient.name
               : 'Accounting SaaS'}
@@ -155,7 +155,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         <div className="px-3 pt-3">
           <button
             onClick={handleBackToFirm}
-            className="touch-target flex w-full items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-kenya-green-100 hover:bg-white/10 hover:text-white transition-colors"
+            className="touch-target flex w-full items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-white hover:bg-white/10 hover:text-white transition-colors"
           >
             <span aria-hidden="true">←</span>
             <span>Back to Firm Overview</span>
@@ -184,7 +184,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
               {/* Collapsible section header */}
               <button
                 onClick={() => toggle(section.id)}
-                className="touch-target flex w-full items-center justify-between rounded-lg px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-kenya-green-300 hover:text-kenya-green-100 transition-colors"
+                className="touch-target flex w-full items-center justify-between rounded-lg px-4 py-2 text-[10px] font-semibold uppercase tracking-widest text-kenya-green-200 hover:text-white transition-colors"
                 aria-expanded={isExpanded}
                 aria-controls={`sidebar-section-${section.id}`}
               >
@@ -231,8 +231,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                         className={clsx(
                           'touch-target flex items-center gap-3 rounded-lg px-4 py-2.5 text-sm font-medium transition-colors',
                           {
-                            'bg-white/20 text-white shadow-sm': isActive,
-                            'text-kenya-green-100 hover:bg-white/10 hover:text-white': !isActive,
+                            'bg-white/25 text-white shadow-sm': isActive,
+                            'text-white hover:bg-white/10 hover:text-white': !isActive,
                           },
                         )}
                       >

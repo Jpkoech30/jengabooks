@@ -76,17 +76,17 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   }, [showProfileMenu, showCompanySwitcher]);
 
   return (
-    <header className="flex h-16 items-center justify-between border-b border-kenya-green-100 bg-white px-6 dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
+    <header className="flex h-16 items-center justify-between border-b border-kenya-gray-200 bg-white px-6 dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
       {/* Left: Hamburger + Page title */}
       <div className="flex items-center gap-4">
         <button
           onClick={onToggleSidebar}
-          className="touch-target flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-kenya-green-50 dark:hover:bg-kenya-green-900 lg:hidden"
+          className="touch-target flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-kenya-gray-50 dark:hover:bg-kenya-green-900 lg:hidden"
           aria-label="Open sidebar menu"
         >
           <span aria-hidden="true">☰</span>
         </button>
-        <h2 className="text-lg font-semibold text-kenya-green-900 dark:text-kenya-green-50">
+        <h2 className="text-lg font-semibold text-kenya-gray-900 dark:text-kenya-green-50">
           {pageTitle}
         </h2>
       </div>
@@ -99,7 +99,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
             <>
               <button
                 onClick={(e) => { e.stopPropagation(); setShowCompanySwitcher(!showCompanySwitcher); setShowProfileMenu(false); }}
-                className="touch-target flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-kenya-green-700 hover:bg-kenya-green-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900"
+                className="touch-target flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-kenya-gray-700 hover:bg-kenya-gray-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900"
                 aria-label={`Switch company (current: ${currentCompanyName || 'None'})`}
                 aria-expanded={showCompanySwitcher}
                 aria-haspopup="true"
@@ -111,9 +111,9 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               {showCompanySwitcher && (
                 <div
                   onClick={(e) => e.stopPropagation()}
-                  className="absolute right-0 top-full mt-2 z-50 w-64 rounded-xl border border-kenya-green-100 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden"
+                  className="absolute right-0 top-full mt-2 z-50 w-64 rounded-xl border border-kenya-gray-200 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden"
                 >
-                  <div className="px-4 py-3 border-b border-kenya-green-100 dark:border-kenya-green-800">
+                  <div className="px-4 py-3 border-b border-kenya-gray-200 dark:border-kenya-green-800">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Switch Company</p>
                   </div>
                   <div className="py-1 max-h-64 overflow-y-auto">
@@ -121,7 +121,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       <button
                         key={m.companyId}
                         onClick={() => handleSwitchCompany(m.companyId)}
-                        className={`touch-target flex w-full items-center gap-3 px-4 py-3 text-sm transition-colors ${m.companyId === currentCompanyId ? 'bg-kenya-green-50 text-kenya-green-900 dark:bg-kenya-green-900/30 dark:text-kenya-green-50' : 'text-kenya-green-700 hover:bg-kenya-green-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900/30'}`}
+                        className={`touch-target flex w-full items-center gap-3 px-4 py-3 text-sm transition-colors ${m.companyId === currentCompanyId ? 'bg-kenya-gray-100 text-kenya-green-900 dark:bg-kenya-green-900/30 dark:text-kenya-green-50' : 'text-kenya-gray-700 hover:bg-kenya-gray-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900/30'}`}
                       >
                         <div className="flex-1 text-left">
                           <p className={`font-medium ${m.companyId === currentCompanyId ? 'font-bold' : ''}`}>
@@ -140,10 +140,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
                       </button>
                     ))}
                   </div>
-                  <div className="border-t border-kenya-green-100 dark:border-kenya-green-800 py-1">
+                  <div className="border-t border-kenya-gray-200 dark:border-kenya-green-800 py-1">
                     <button
                       onClick={() => { setShowCompanySwitcher(false); navigate('/settings'); }}
-                      className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-700 hover:bg-kenya-green-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900/30"
+                      className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-gray-700 hover:bg-kenya-gray-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900/30"
                     >
                       <span className="text-base">➕</span>
                       <span>Create New Company</span>
@@ -153,7 +153,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               )}
             </>
           ) : (
-            <span className="inline-flex items-center px-3 py-2 text-sm font-medium text-kenya-green-700 dark:text-kenya-green-300">
+            <span className="inline-flex items-center px-3 py-2 text-sm font-medium text-kenya-gray-700 dark:text-kenya-green-300">
               {currentCompanyName || 'JengaBooks'}
             </span>
           )}
@@ -163,7 +163,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         <div className="relative">
           <button
             onClick={(e) => { e.stopPropagation(); setShowProfileMenu(!showProfileMenu); setShowCompanySwitcher(false); }}
-            className="touch-target flex items-center gap-2 rounded-lg border border-kenya-green-100 bg-white px-3 py-1.5 hover:bg-kenya-green-50 dark:border-kenya-green-800 dark:bg-kenya-surface-dark dark:hover:bg-kenya-green-900"
+            className="touch-target flex items-center gap-2 rounded-lg border border-kenya-gray-200 bg-white px-3 py-1.5 hover:bg-kenya-gray-50 dark:border-kenya-green-800 dark:bg-kenya-surface-dark dark:hover:bg-kenya-green-900"
             aria-label={`Profile menu${user?.name ? ' (' + user.name + ')' : ''}`}
             aria-expanded={showProfileMenu}
             aria-haspopup="true"
@@ -179,30 +179,30 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           {showProfileMenu && (
             <div
               onClick={(e) => e.stopPropagation()}
-              className="absolute right-0 top-full mt-2 z-50 w-80 rounded-xl border border-kenya-green-100 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden"
+              className="absolute right-0 top-full mt-2 z-50 w-80 rounded-xl border border-kenya-gray-200 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden"
             >
               {hasNotifications && (
                 <>
-                  <div className="px-4 py-3 border-b border-kenya-green-100 dark:border-kenya-green-800">
+                  <div className="px-4 py-3 border-b border-kenya-gray-200 dark:border-kenya-green-800">
                     <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notifications</p>
                   </div>
                   <div className="py-1 max-h-48 overflow-y-auto">
                     {recentActivity.slice(0, 5).map((activity, i) => (
                       <div
                         key={i}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-kenya-green-900 dark:text-kenya-green-50 hover:bg-kenya-green-50 dark:hover:bg-kenya-green-900/30"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-kenya-gray-900 dark:text-kenya-green-50 hover:bg-kenya-gray-50 dark:hover:bg-kenya-green-900/30"
                       >
-                        <span className="text-xs font-medium text-kenya-amber-600 shrink-0">+{activity.points} XP</span>
+                        <span className="text-xs font-medium text-amber-700 shrink-0">+{activity.points} XP</span>
                         <span className="text-xs text-gray-600 dark:text-gray-400">{activity.reason}</span>
                       </div>
                     ))}
                   </div>
-                  <div className="border-t border-kenya-green-100 dark:border-kenya-green-800" />
+                  <div className="border-t border-kenya-gray-200 dark:border-kenya-green-800" />
                 </>
               )}
 
-              <div className="px-4 py-4 border-b border-kenya-green-100 dark:border-kenya-green-800">
-                <p className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50 truncate">
+              <div className="px-4 py-4 border-b border-kenya-gray-200 dark:border-kenya-green-800">
+                <p className="text-sm font-semibold text-kenya-gray-900 dark:text-kenya-green-50 truncate">
                   {user?.name || 'User'}
                 </p>
                 <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
@@ -218,28 +218,28 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               <div className="py-1">
                 <button
                   onClick={() => { navigate('/profile'); setShowProfileMenu(false); }}
-                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-900 hover:bg-kenya-green-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
+                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-gray-900 hover:bg-kenya-gray-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
                 >
                   <span className="text-base">👤</span>
                   <span>My Profile</span>
                 </button>
                 <button
                   onClick={() => { navigate('/team'); setShowProfileMenu(false); }}
-                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-900 hover:bg-kenya-green-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
+                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-gray-900 hover:bg-kenya-gray-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
                 >
                   <span className="text-base">👥</span>
                   <span>Team Management</span>
                 </button>
                 <button
                   onClick={() => { navigate('/settings'); setShowProfileMenu(false); }}
-                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-900 hover:bg-kenya-green-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
+                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-gray-900 hover:bg-kenya-gray-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
                 >
                   <span className="text-base">⚙️</span>
                   <span>Settings</span>
                 </button>
               </div>
 
-              <div className="border-t border-kenya-green-100 dark:border-kenya-green-800 py-1">
+              <div className="border-t border-kenya-gray-200 dark:border-kenya-green-800 py-1">
                 <button
                   onClick={handleLogout}
                   className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
