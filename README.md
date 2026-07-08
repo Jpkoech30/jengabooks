@@ -530,16 +530,60 @@ node scripts/test-conn2.js
 # ✗ localhost: Can't reach database server at localhost:5432
 ```
 
-#### Using the Dev Launcher (one-command start)
+#### Automation: One-command start
+
+The dev launcher script handles everything automatically:
 
 ```powershell
-# From PowerShell — starts WSL services, waits for them, then starts the app
 .\scripts\dev.ps1
 ```
 
-#### If WSL IP Changes
+**What it does:**
+1. Starts WSL (if not running)
+2. Starts PostgreSQL and Redis in WSL
+3. **Auto-detects the WSL IP** and injects it into `DATABASE_URL` at runtime
+4. Waits for PostgreSQL and Redis to be ready (retries up to 15 times)
+5. Checks optional 3rd party API connectivity (DeepSeek, KRA eTIMS)
+6. Starts the JengaBooks dev server
 
-WSL's IP can change after a reboot. To find the new IP:
+**Expected output:**
+```
+=== JengaBooks Dev Environment ===
+
+[1/5] Checking WSL status...
+  ✓ WSL is ready
+[2/5] Starting PostgreSQL...
+  ✓ PostgreSQL already running
+[3/5] Starting Redis...
+  ✓ Redis already running
+[4/5] Detecting WSL IP and configuring connection...
+  ✓ DATABASE_URL configured with WSL IP
+    → postgresql://postgres:postgres@192.168.1.180:5432/jengabooks?schema=public&sslmode=disable
+[5/5] Verifying service connectivity...
+  ✓ PostgreSQL is ready
+  ✓ Redis is ready
+  - DeepSeek AI API: skipped (no API key configured)
+  - KRA eTIMS API: skipped (no KRA_API_URL configured)
+  ✅ All services are ready! Starting application...
+```
+
+**Options:**
+```powershell
+# Skip the service health check (faster startup)
+.\scripts\dev.ps1 -SkipServiceCheck
+
+# Skip WSL steps entirely (for Docker or Linux)
+.\scripts\dev.ps1 -SkipWsl
+
+# Specify a different WSL distro
+.\scripts\dev.ps1 -WslDistro Ubuntu-22.04
+```
+
+> **How IP injection works:** The script runs [`node scripts/wsl-ip.js --export`](jengabooks/scripts/wsl-ip.js) which outputs `$env:DATABASE_URL="postgresql://...@<detected-ip>..."`. This env var overrides whatever is in the `.env` file, so you **never need to edit `.env` when the WSL IP changes**.
+
+#### If WSL IP Changes (manual fallback)
+
+WSL's IP can change after a reboot. If you're not using `dev.ps1`, find the new IP:
 
 ```powershell
 wsl -- ip addr | findstr "inet "
@@ -548,6 +592,13 @@ wsl -- ip addr | findstr "inet "
 Then update `DATABASE_URL` in both:
 - [`jengabooks/.env`](jengabooks/.env)
 - [`jengabooks/apps/api/.env`](jengabooks/apps/api/.env)
+
+Or better, use the automated script:
+```powershell
+# This detects the IP and exports the correct DATABASE_URL for the current session
+$env:DATABASE_URL = "$(node scripts/wsl-ip.js --export)"
+npm run dev
+```
 
 ---
 

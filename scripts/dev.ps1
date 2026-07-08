@@ -3,26 +3,46 @@
 .SYNOPSIS
     JengaBooks Dev Environment Launcher
 .DESCRIPTION
-    Ensures WSL services (PostgreSQL, Redis) are running before starting
-    the JengaBooks dev server. Handles WSL auto-start and service gating
-    so developers don't need to manually manage infrastructure.
+    Automated dev environment startup for Windows + WSL.
+    
+    What it does:
+      1. Ensures WSL is running
+      2. Starts PostgreSQL and Redis inside WSL (if not already running)
+      3. Auto-detects WSL IP and injects DATABASE_URL with correct host
+      4. Waits for PostgreSQL and Redis to be reachable
+      5. Checks optional 3rd party API connectivity (non-blocking)
+      6. Starts the JengaBooks dev server with correct env vars
+
+    On Linux or macOS, WSL-specific steps are skipped and localhost is used.
+
 .PARAMETER WslDistro
     The WSL distribution name. Defaults to 'Ubuntu'.
+
 .PARAMETER SkipServiceCheck
-    If set, skips the service health check and starts the app immediately.
+    If set, skips service health checks and starts the app immediately.
+
+.PARAMETER SkipWsl
+    If set, skips WSL-related steps (for Docker or Linux-native setups).
+
 .EXAMPLE
     .\scripts\dev.ps1
     .\scripts\dev.ps1 -WslDistro Ubuntu-22.04
     .\scripts\dev.ps1 -SkipServiceCheck
+    .\scripts\dev.ps1 -SkipWsl
 #>
 
 param(
-    [string]$WslDistro = "Ubuntu",
-    [switch]$SkipServiceCheck
+    [string]$WslDistro = "Ubuntu-26.04",
+    [switch]$SkipServiceCheck,
+    [switch]$SkipWsl
 )
 
 $ErrorActionPreference = "Stop"
 $JengaRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+
+# Detect platform
+$isWindows = [System.Environment]::OSVersion.Platform -eq [System.PlatformID]::Win32NT
+$isWsl = $isWindows -and (-not $SkipWsl)
 
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
@@ -30,50 +50,83 @@ Write-Host "   JengaBooks — Dev Environment" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 
-# ---- Step 1: Check WSL ----
-Write-Host "[1/4] Checking WSL status..." -ForegroundColor Cyan
-$wslInfo = wsl -l -v 2>&1 | Out-String
-if ($wslInfo -match "No installed distributions") {
-    Write-Warning "No WSL distributions found. Please install WSL first."
-    exit 1
-}
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 1: Start WSL (skip if not Windows or SkipWsl)
+# ═══════════════════════════════════════════════════════════════════════════════
+if ($isWsl) {
+    Write-Host "[1/5] Checking WSL status..." -ForegroundColor Cyan
+    $wslInfo = wsl -l -v 2>&1 | Out-String
+    if ($wslInfo -match "No installed distributions") {
+        Write-Warning "No WSL distributions found. Use -SkipWsl if running with Docker."
+        exit 1
+    }
 
-$wslRunning = $wslInfo -match "$WslDistro\s+Running"
-if (-not $wslRunning) {
-    Write-Host "  → Starting WSL distribution '$WslDistro'..." -ForegroundColor Yellow
-    wsl -d $WslDistro -- echo "WSL started" 2>&1 | Out-Null
-    Start-Sleep -Seconds 2
-}
-Write-Host "  ✓ WSL is ready" -ForegroundColor Green
+    $wslRunning = $wslInfo -match "$WslDistro\s+Running"
+    if (-not $wslRunning) {
+        Write-Host "  → Starting WSL distribution '$WslDistro'..." -ForegroundColor Yellow
+        wsl -d $WslDistro -- echo "WSL started" 2>&1 | Out-Null
+        Start-Sleep -Seconds 2
+    }
+    Write-Host "  ✓ WSL is ready" -ForegroundColor Green
 
-# ---- Step 2: Start PostgreSQL in WSL ----
-Write-Host "[2/4] Starting PostgreSQL..." -ForegroundColor Cyan
-$pgStatus = wsl -d $WslDistro -u root -- service postgresql status 2>&1 | Out-String
-if ($pgStatus -match "is running") {
-    Write-Host "  ✓ PostgreSQL already running" -ForegroundColor Green
+    # ═══════════════════════════════════════════════════════════════════════════
+    # STEP 2: Start infrastructure in WSL
+    # ═══════════════════════════════════════════════════════════════════════════
+    Write-Host "[2/5] Starting PostgreSQL..." -ForegroundColor Cyan
+    $pgStatus = wsl -d $WslDistro -u root -- service postgresql status 2>&1 | Out-String
+    if ($pgStatus -match "is running") {
+        Write-Host "  ✓ PostgreSQL already running" -ForegroundColor Green
+    } else {
+        wsl -d $WslDistro -u root -- service postgresql start 2>&1 | Out-Null
+        Start-Sleep -Seconds 1
+        Write-Host "  ✓ PostgreSQL started" -ForegroundColor Green
+    }
+
+    Write-Host "[3/5] Starting Redis..." -ForegroundColor Cyan
+    $redisStatus = wsl -d $WslDistro -u root -- service redis-server status 2>&1 | Out-String
+    if ($redisStatus -match "is running") {
+        Write-Host "  ✓ Redis already running" -ForegroundColor Green
+    } else {
+        wsl -d $WslDistro -u root -- service redis-server start 2>&1 | Out-Null
+        Start-Sleep -Seconds 1
+        Write-Host "  ✓ Redis started" -ForegroundColor Green
+    }
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # STEP 3: Auto-detect WSL IP and inject DATABASE_URL
+    # ═══════════════════════════════════════════════════════════════════════════
+    Write-Host "[4/5] Detecting WSL IP and configuring connection..." -ForegroundColor Cyan
+
+    # Run the IP detection script and capture the export command
+    $wslIpExport = & node "$JengaRoot\scripts\wsl-ip.js" --export 2>&1
+    # The --export flag outputs: $env:DATABASE_URL="..."
+    # on stdout (for PowerShell) and stderr (for bash)
+    $exportLine = $wslIpExport | Select-String -Pattern '^\$env:DATABASE_URL=' | Select-Object -First 1
+
+    if ($exportLine) {
+        # Execute the export command to set the env var for this process
+        Invoke-Expression $exportLine
+        Write-Host "  ✓ DATABASE_URL configured with WSL IP" -ForegroundColor Green
+        Write-Host "    → $env:DATABASE_URL" -ForegroundColor Gray
+    } else {
+        Write-Warning "  ⚠ Could not detect WSL IP. Using .env as-is."
+        Write-Host "    → Falling back to configured DATABASE_URL" -ForegroundColor Yellow
+    }
 } else {
-    wsl -d $WslDistro -u root -- service postgresql start 2>&1 | Out-Null
-    Start-Sleep -Seconds 1
-    Write-Host "  ✓ PostgreSQL started" -ForegroundColor Green
+    # Non-WSL or SkipWsl: use localhost (Docker or Linux native)
+    Write-Host "[1/4] Platform: $([System.Environment]::OSVersion.Platform)" -ForegroundColor Cyan
+    Write-Host "  → Using localhost (Linux native or Docker)" -ForegroundColor Yellow
 }
 
-# ---- Step 3: Start Redis in WSL ----
-Write-Host "[3/4] Starting Redis..." -ForegroundColor Cyan
-$redisStatus = wsl -d $WslDistro -u root -- service redis-server status 2>&1 | Out-String
-if ($redisStatus -match "is running") {
-    Write-Host "  ✓ Redis already running" -ForegroundColor Green
-} else {
-    wsl -d $WslDistro -u root -- service redis-server start 2>&1 | Out-Null
-    Start-Sleep -Seconds 1
-    Write-Host "  ✓ Redis started" -ForegroundColor Green
-}
-
-# ---- Step 4: Check service health ----
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 4: Verify service connectivity
+# ═══════════════════════════════════════════════════════════════════════════════
 if (-not $SkipServiceCheck) {
-    Write-Host "[4/4] Verifying service connectivity..." -ForegroundColor Cyan
+    $stepLabel = if ($isWsl) { "[5/5]" } else { "[2/4]" }
+    Write-Host "${stepLabel} Verifying service connectivity..." -ForegroundColor Cyan
     Push-Location $JengaRoot
     try {
-        node scripts/wait-for-services.js
+        & node scripts/wait-for-services.js
         if ($LASTEXITCODE -ne 0) {
             throw "Service health check failed"
         }
@@ -81,16 +134,19 @@ if (-not $SkipServiceCheck) {
         Pop-Location
     }
 } else {
-    Write-Host "[4/4] Service check skipped (-SkipServiceCheck)" -ForegroundColor Yellow
+    $stepLabel = if ($isWsl) { "[5/5]" } else { "[2/4]" }
+    Write-Host "${stepLabel} Service check skipped (-SkipServiceCheck)" -ForegroundColor Yellow
 }
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# STEP 5: Start the app
+# ═══════════════════════════════════════════════════════════════════════════════
 Write-Host ""
 Write-Host "========================================" -ForegroundColor Green
 Write-Host "   Starting JengaBooks..." -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Green
 Write-Host ""
 
-# ---- Start dev server ----
 Push-Location $JengaRoot
 npm run dev
 Pop-Location
