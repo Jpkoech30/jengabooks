@@ -280,7 +280,7 @@ export function MpesaImport() {
             description="Upload a CSV or PDF statement to get started."
             skeletonRows={5}
           >
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto max-h-[600px] overflow-y-auto">
               {/* Batch action bar */}
               {selectedIds.size > 0 && (
                 <div className="flex items-center gap-3 px-4 py-2 bg-kenya-green-50 dark:bg-kenya-green-900/30 border-b border-kenya-green-100 dark:border-kenya-green-800">
