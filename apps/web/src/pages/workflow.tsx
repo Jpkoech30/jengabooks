@@ -23,97 +23,125 @@ interface WorkflowData {
 
 const PHASE_ORDER = ['data-collection', 'categorization', 'reconciliation', 'adjustments', 'reporting'];
 
+/** Distinct phase icons for better visual identity */
+const PHASE_ICONS: Record<string, string> = {
+  'data-collection': '📤',
+  categorization: '🏷️',
+  reconciliation: '🔄',
+  adjustments: '🔒',
+  reporting: '📊',
+};
+
+/** Format a Date as "MMMM yyyy" */
+function formatMonthLabel(date: Date): string {
+  return date.toLocaleDateString('en-KE', { month: 'long', year: 'numeric' });
+}
+
+/** Return a new Date offset by `delta` months */
+function offsetMonth(date: Date, delta: number): Date {
+  const d = new Date(date);
+  d.setMonth(d.getMonth() + delta);
+  return d;
+}
+
 export function Workflow() {
   const navigate = useNavigate();
   const [data, setData] = React.useState<WorkflowData | null>(null);
   const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+  const [currentMonth, setCurrentMonth] = React.useState(() => new Date());
 
-  React.useEffect(() => {
-    async function load() {
-      try {
-        // Fetch real data to determine workflow state
-        const [entries, trialBalance, hitlItems, healthScore] = await Promise.all([
-          api.get<any>('/ledger/entries?limit=1').catch(() => ({ total: 0 })),
-          api.get<any>('/ledger/trial-balance').catch(() => null),
-          api.get<any>('/hitl').catch(() => ({ items: [], total: 0 })),
-          api.get<any>('/health-score').catch(() => null),
-        ]);
+  const loadWorkflow = React.useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [entries, trialBalance, hitlItems, healthScore] = await Promise.all([
+        api.get<any>('/ledger/entries?limit=1').catch(() => ({ total: 0 })),
+        api.get<any>('/ledger/trial-balance').catch(() => null),
+        api.get<any>('/hitl').catch(() => ({ items: [], total: 0 })),
+        api.get<any>('/health-score').catch(() => null),
+      ]);
 
-        const hasEntries = entries.total > 0;
-        const isBalanced = trialBalance?.balanced ?? false;
-        const pendingHitl = (hitlItems as any)?.items?.filter((i: any) => i.status === 'PENDING').length || 0;
+      const hasEntries = entries.total > 0;
+      const isBalanced = trialBalance?.balanced ?? false;
+      const pendingHitl = (hitlItems as any)?.items?.filter((i: any) => i.status === 'PENDING').length || 0;
 
-        const phases: PhaseData[] = [
-          {
-            id: 'data-collection',
-            label: 'Data Collection',
-            icon: '📤',
-            status: hasEntries ? 'complete' : 'pending',
-            details: hasEntries ? `${entries.total} entries imported` : 'Upload M-Pesa or bank statements',
-            actionUrl: '/mpesa',
-          },
-          {
-            id: 'categorization',
-            label: 'Categorization',
-            icon: '🏷️',
-            status: hasEntries && isBalanced ? 'complete' : hasEntries ? 'in_progress' : 'pending',
-            details: hasEntries ? (isBalanced ? 'All categorized ✓' : `${pendingHitl} items need review`) : 'Waiting for data',
-            actionUrl: hasEntries ? '/ledger' : undefined,
-          },
-          {
-            id: 'reconciliation',
-            label: 'Reconciliation',
-            icon: '🔄',
-            status: isBalanced && pendingHitl === 0 ? 'complete' : isBalanced ? 'in_progress' : 'pending',
-            details: pendingHitl === 0 ? 'All matched ✓' : `${pendingHitl} items to resolve`,
-            actionUrl: '/hitl',
-          },
-          {
-            id: 'adjustments',
-            label: 'Month-End Close',
-            icon: '🔒',
-            status: isBalanced && pendingHitl === 0 && healthScore ? 'in_progress' : 'pending',
-            details: healthScore ? 'Ready for lockdown' : 'Complete previous steps first',
-            actionUrl: '/ledger',
-          },
-          {
-            id: 'reporting',
-            label: 'Reporting',
-            icon: '📊',
-            status: healthScore ? 'in_progress' : 'pending',
-            details: 'Generate P&L, Balance Sheet, and Cash Flow',
-            actionUrl: '/reports',
-          },
-        ];
+      const phases: PhaseData[] = [
+        {
+          id: 'data-collection',
+          label: 'Data Collection',
+          icon: PHASE_ICONS['data-collection']!,
+          status: hasEntries ? 'complete' : 'pending',
+          details: hasEntries ? `${entries.total} entries imported` : 'Upload M-Pesa or bank statements',
+          actionUrl: '/mpesa',
+        },
+        {
+          id: 'categorization',
+          label: 'Categorization',
+          icon: PHASE_ICONS['categorization']!,
+          status: hasEntries && isBalanced ? 'complete' : hasEntries ? 'in_progress' : 'pending',
+          details: hasEntries ? (isBalanced ? 'All categorized ✓' : `${pendingHitl} items need review`) : 'Waiting for data',
+          actionUrl: hasEntries ? '/ledger' : undefined,
+        },
+        {
+          id: 'reconciliation',
+          label: 'Reconciliation',
+          icon: PHASE_ICONS['reconciliation']!,
+          status: isBalanced && pendingHitl === 0 ? 'complete' : isBalanced ? 'in_progress' : 'pending',
+          details: pendingHitl === 0 ? 'All matched ✓' : `${pendingHitl} items to resolve`,
+          actionUrl: '/hitl',
+        },
+        {
+          id: 'adjustments',
+          label: 'Month-End Close',
+          icon: PHASE_ICONS['adjustments']!,
+          status: isBalanced && pendingHitl === 0 && healthScore ? 'in_progress' : 'pending',
+          details: healthScore ? 'Ready for lockdown' : 'Complete previous steps first',
+          actionUrl: '/ledger',
+        },
+        {
+          id: 'reporting',
+          label: 'Reporting',
+          icon: PHASE_ICONS['reporting']!,
+          status: healthScore ? 'in_progress' : 'pending',
+          details: 'Generate P&L, Balance Sheet, and Cash Flow',
+          actionUrl: '/reports',
+        },
+      ];
 
-        const completed = phases.filter(p => p.status === 'complete').length;
-        setData({
-          overallProgress: Math.round((completed / 5) * 100),
-          phases,
-          currentPhase: phases.find(p => p.status === 'in_progress' || p.status === 'pending')?.id,
-        });
-      } catch {
-        // Fallback
-        const fallbackPhases = PHASE_ORDER.map(id => ({
-          id, label: id, icon: '📋', status: 'pending' as const,
-          details: '',
-          actionUrl: undefined as string | undefined,
-        }));
-        setData({
-          overallProgress: 0,
-          phases: fallbackPhases,
-          currentPhase: fallbackPhases[0]?.id,
-        });
-      } finally {
-        setLoading(false);
-      }
+      const completed = phases.filter(p => p.status === 'complete').length;
+      setData({
+        overallProgress: Math.round((completed / 5) * 100),
+        phases,
+        currentPhase: phases.find(p => p.status === 'in_progress' || p.status === 'pending')?.id,
+      });
+    } catch (err) {
+      setError('Failed to load workflow data. Please try again.');
+      // Fallback
+      const fallbackPhases = PHASE_ORDER.map(id => ({
+        id, label: id, icon: PHASE_ICONS[id] || '📋', status: 'pending' as const,
+        details: '',
+        actionUrl: undefined as string | undefined,
+      }));
+      setData({
+        overallProgress: 0,
+        phases: fallbackPhases,
+        currentPhase: fallbackPhases[0]?.id,
+      });
+    } finally {
+      setLoading(false);
     }
-    load();
   }, []);
 
-  if (loading) {
-    return <PageState state="loading" skeletonRows={4} />;
-  }
+  React.useEffect(() => { loadWorkflow(); }, [loadWorkflow]);
+
+  const canGoPrev = true;
+  const canGoNext = currentMonth.toISOString().slice(0, 7) < new Date().toISOString().slice(0, 7);
+
+  const handlePrevMonth = () => setCurrentMonth(offsetMonth(currentMonth, -1));
+  const handleNextMonth = () => {
+    if (canGoNext) setCurrentMonth(offsetMonth(currentMonth, 1));
+  };
 
   const statusColors = {
     complete: 'border-l-green-500 bg-green-50 dark:bg-green-900/20',
@@ -127,11 +155,60 @@ export function Workflow() {
     pending: '⏸️',
   };
 
+  if (loading && !data) {
+    return (
+      <PageShell title="Monthly Workflow" subtitle="Track your bookkeeping progress month by month">
+        <PageState state="loading" skeletonRows={6}>
+          <></>
+        </PageState>
+      </PageShell>
+    );
+  }
+
+  if (error && !data) {
+    return (
+      <PageShell title="Monthly Workflow" subtitle="Track your bookkeeping progress month by month">
+        <PageState
+          state="empty"
+          icon="⚠️"
+          title="Unable to load workflow"
+          description={error}
+          action={{ label: 'Try again', onClick: loadWorkflow }}
+        >
+          <></>
+        </PageState>
+      </PageShell>
+    );
+  }
+
   return (
     <PageShell
       title="Monthly Workflow"
       subtitle="Track your bookkeeping progress month by month"
     >
+
+      {/* Month Selector */}
+      <Card>
+        <CardContent className="p-4">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="sm" onClick={handlePrevMonth} aria-label="Previous month">
+              ← Prev
+            </Button>
+            <h2 className="text-base font-bold text-kenya-green-900 dark:text-kenya-green-50">
+              {formatMonthLabel(currentMonth)}
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleNextMonth}
+              disabled={!canGoNext}
+              aria-label="Next month"
+            >
+              Next →
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Overall Progress */}
       <Card>
@@ -175,7 +252,7 @@ export function Workflow() {
           >
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <span className="text-2xl">{phase.icon}</span>
+                <span className="text-2xl" aria-hidden="true">{phase.icon}</span>
                 <div>
                   <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
                     {phase.label}
@@ -186,7 +263,7 @@ export function Workflow() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-sm">{statusIcons[phase.status]}</span>
+                <span className="text-sm" aria-label={phase.status.replace('_', ' ')}>{statusIcons[phase.status]}</span>
                 {phase.actionUrl && (
                   <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); navigate(phase.actionUrl!); }}>
                     View →

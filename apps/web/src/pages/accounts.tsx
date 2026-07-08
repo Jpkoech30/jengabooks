@@ -33,6 +33,23 @@ const TYPE_COLORS: Record<string, string> = {
 
 const ACCOUNT_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] as const;
 
+/** Highlights matching search text with a yellow background */
+function highlightText(text: string, query: string): React.ReactNode {
+  if (!query) return text;
+  const lower = text.toLowerCase();
+  const idx = lower.indexOf(query.toLowerCase());
+  if (idx === -1) return text;
+  return (
+    <>
+      {text.slice(0, idx)}
+      <mark className="bg-yellow-200 dark:bg-yellow-700/50 rounded px-0.5">
+        {text.slice(idx, idx + query.length)}
+      </mark>
+      {text.slice(idx + query.length)}
+    </>
+  );
+}
+
 export function Accounts() {
   const queryClient = useQueryClient();
   const [accounts, setAccounts] = React.useState<Account[]>([]);
@@ -172,11 +189,17 @@ export function Accounts() {
 
   const renderAccountRow = (account: Account, depth: number = 0) => (
     <React.Fragment key={account.id}>
-      <tr className="border-b border-kenya-green-50 dark:border-kenya-green-900 last:border-0 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30">
+      <tr className={`border-b border-kenya-green-50 dark:border-kenya-green-900 last:border-0 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30 ${
+        depth % 2 === 0 ? 'bg-white dark:bg-transparent' : 'bg-kenya-green-50/20 dark:bg-kenya-green-900/10'
+      }`}>
         <td className="py-3 px-3" style={{ paddingLeft: `${16 + depth * 24}px` }}>
-          <span className="font-mono text-xs text-kenya-green-700 dark:text-kenya-green-300">{account.code}</span>
+          <span className="font-mono text-xs text-kenya-green-700 dark:text-kenya-green-300">
+            {highlightText(account.code, search)}
+          </span>
         </td>
-        <td className="py-3 px-3 text-kenya-green-900 dark:text-kenya-green-50 font-medium">{account.name}</td>
+        <td className="py-3 px-3 text-kenya-green-900 dark:text-kenya-green-50 font-medium">
+          {highlightText(account.name, search)}
+        </td>
         <td className="py-3 px-3">
           <Badge variant={(TYPE_COLORS[account.type] || 'neutral') as any} size="sm">
             {account.type}
@@ -307,7 +330,8 @@ export function Accounts() {
             state={loading ? 'loading' : accounts.length === 0 ? 'empty' : 'ready'}
             icon="📒"
             title="No accounts yet"
-            description="Create your first account to get started."
+            description="Create your first account to get started with the chart of accounts."
+            action={{ label: 'Create your first account', onClick: () => setShowCreateForm(true) }}
             skeletonRows={5}
           >
             <div className="overflow-x-auto">

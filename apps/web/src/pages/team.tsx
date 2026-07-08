@@ -19,6 +19,10 @@ interface Member {
   user: { id: string; email: string; name: string };
 }
 
+interface OnlineStatus {
+  [userId: string]: boolean;
+}
+
 const ROLE_OPTIONS: Record<string, string> = {
   SME_OWNER: 'Owner',
   ACCOUNTANT: 'Accountant',
@@ -27,6 +31,13 @@ const ROLE_OPTIONS: Record<string, string> = {
 };
 
 const ROLE_LIST = ['ACCOUNTANT', 'VIEWER', 'AUDITOR'] as const;
+
+/** Color-coded Badge variant per role */
+const ROLE_BADGE_VARIANT: Record<string, 'success' | 'info' | 'warning'> = {
+  ACCOUNTANT: 'success',
+  VIEWER: 'info',
+  AUDITOR: 'warning',
+};
 
 export function Team() {
   const companyId = useAuthStore((state) => state.user?.companyId);
@@ -39,6 +50,7 @@ export function Team() {
   const [inviteName, setInviteName] = React.useState('');
   const [sending, setSending] = React.useState(false);
   const [changingRole, setChangingRole] = React.useState<string | null>(null);
+  const [onlineStatus, setOnlineStatus] = React.useState<OnlineStatus>({});
 
   const loadMembers = async () => {
     if (!companyId) return;
@@ -46,6 +58,14 @@ export function Team() {
     try {
       const data = await api.get<Member[]>(`/companies/${companyId}/members`);
       setMembers(data);
+      // Mock online status — 70% chance online, stable per session
+      const status: OnlineStatus = {};
+      data.forEach((m) => {
+        // Use userId char code as pseudo-random seed for consistency
+        const seed = m.userId.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+        status[m.userId] = (seed % 10) > 2; // ~70% online
+      });
+      setOnlineStatus(status);
     } catch (err: any) {
       showToast('error', 'Failed to load team', err?.response?.data?.message || 'Could not load team members');
     } finally { setLoading(false); }
@@ -143,54 +163,71 @@ export function Team() {
             state={loading ? 'loading' : members.length === 0 ? 'empty' : 'ready'}
             icon="👥"
             title="No team members yet"
-            description="Invite someone to collaborate."
+            description="Invite your colleagues to collaborate on your company's books."
+            action={{ label: 'Invite your first member', onClick: () => setShowInvite(true) }}
             skeletonRows={3}
           >
             <div className="space-y-3">
-              {members.map((member) => (
-                <div key={member.id} className="flex items-center justify-between rounded-xl border border-kenya-green-100 p-4 dark:border-kenya-green-800">
-                  <div className="flex items-center gap-4">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-kenya-green-100 text-sm font-bold text-kenya-green-700 dark:bg-kenya-green-900 dark:text-kenya-green-300">
-                      {member.user.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">{member.user.name}</p>
-                      <p className="text-xs text-gray-500 dark:text-gray-400">{member.user.email}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {/* Role badge with change dropdown for non-owners */}
-                    {member.role === 'SME_OWNER' ? (
-                      <Badge variant="success" size="sm">Owner</Badge>
-                    ) : (
-                      <div className="relative">
-                        <select
-                          value={member.role}
-                          onChange={(e) => handleRoleChange(member.userId, e.target.value, member.user.name)}
-                          disabled={changingRole === member.userId || member.userId === currentUserId}
-                          className={`text-xs rounded-lg border px-3 py-2 pr-8 appearance-none cursor-pointer ${
-                            member.role === 'ACCOUNTANT'
-                              ? 'border-kenya-green-200 bg-kenya-green-50 text-kenya-green-700 dark:border-kenya-green-700 dark:bg-kenya-green-900/30 dark:text-kenya-green-300'
-                              : member.role === 'VIEWER'
-                              ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
-                              : 'border-kenya-amber-200 bg-kenya-amber-50 text-kenya-amber-700 dark:border-kenya-amber-700 dark:bg-kenya-amber-900/30 dark:text-kenya-amber-300'
+              {members.map((member) => {
+                const isOnline = onlineStatus[member.userId];
+                return (
+                  <div key={member.id} className="flex items-center justify-between rounded-xl border border-kenya-green-100 p-4 dark:border-kenya-green-800">
+                    <div className="flex items-center gap-4">
+                      <div className="relative flex h-10 w-10 items-center justify-center rounded-full bg-kenya-green-100 text-sm font-bold text-kenya-green-700 dark:bg-kenya-green-900 dark:text-kenya-green-300">
+                        {member.user.name.charAt(0).toUpperCase()}
+                        {/* Online status dot */}
+                        <span
+                          className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white dark:border-kenya-green-900 ${
+                            isOnline ? 'bg-green-500' : 'bg-gray-400'
                           }`}
-                        >
-                          {ROLE_LIST.map((role) => (
-                            <option key={role} value={role}>{ROLE_OPTIONS[role]}</option>
-                          ))}
-                        </select>
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none" aria-hidden="true">▾</span>
+                          title={isOnline ? 'Online' : 'Offline'}
+                        />
                       </div>
-                    )}
-                    {member.role !== 'SME_OWNER' && (
-                      <Button variant="ghost" size="sm" onClick={() => handleRemove(member.userId, member.user.name)}>
-                        Remove
-                      </Button>
-                    )}
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
+                            {member.user.name}
+                          </p>
+                          <span className={`inline-block h-2 w-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+                          <span className="text-xs text-gray-400">{isOnline ? 'Online' : 'Offline'}</span>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{member.user.email}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {/* Role badge with change dropdown for non-owners */}
+                      {member.role === 'SME_OWNER' ? (
+                        <Badge variant="success" size="sm">Owner</Badge>
+                      ) : (
+                        <div className="relative">
+                          <select
+                            value={member.role}
+                            onChange={(e) => handleRoleChange(member.userId, e.target.value, member.user.name)}
+                            disabled={changingRole === member.userId || member.userId === currentUserId}
+                            className={`text-xs rounded-lg border px-3 py-2 pr-8 appearance-none cursor-pointer ${
+                              member.role === 'ACCOUNTANT'
+                                ? 'border-kenya-green-200 bg-kenya-green-50 text-kenya-green-700 dark:border-kenya-green-700 dark:bg-kenya-green-900/30 dark:text-kenya-green-300'
+                                : member.role === 'VIEWER'
+                                ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                : 'border-kenya-amber-200 bg-kenya-amber-50 text-kenya-amber-700 dark:border-kenya-amber-700 dark:bg-kenya-amber-900/30 dark:text-kenya-amber-300'
+                            }`}
+                          >
+                            {ROLE_LIST.map((role) => (
+                              <option key={role} value={role}>{ROLE_OPTIONS[role]}</option>
+                            ))}
+                          </select>
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none" aria-hidden="true">▾</span>
+                        </div>
+                      )}
+                      {member.role !== 'SME_OWNER' && (
+                        <Button variant="ghost" size="sm" onClick={() => handleRemove(member.userId, member.user.name)}>
+                          Remove
+                        </Button>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </PageState>
         </CardContent>

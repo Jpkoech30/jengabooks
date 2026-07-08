@@ -18,6 +18,16 @@ interface Invoice {
   etimsSubmission?: { status: string } | null;
 }
 
+/** Returns the last day of the current month as a YYYY-MM-DD string */
+function endOfMonth(): string {
+  const now = new Date();
+  // Use Nairobi timezone offset (+3h) for calculation
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const lastDay = new Date(year, month + 1, 0);
+  return lastDay.toISOString().slice(0, 10);
+}
+
 export function ETIMS() {
   const [invoices, setInvoices] = React.useState<Invoice[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -28,7 +38,7 @@ export function ETIMS() {
     customerEmail: '',
     lineItems: [{ description: '', quantity: 1, unitPrice: 0 }],
     taxCode: 'S',
-    dueDate: '',
+    dueDate: endOfMonth(),
     notes: '',
   });
 
@@ -93,6 +103,10 @@ export function ETIMS() {
     return invoice.status;
   };
 
+  const syncedCount = invoices.filter((i) => i.etimsSubmission?.status === 'ACCEPTED').length;
+  const pendingCount = invoices.filter((i) => !i.etimsSubmission || i.etimsSubmission.status === 'PENDING').length;
+  const failedCount = invoices.filter((i) => i.etimsSubmission?.status === 'FAILED').length;
+
   return (
     <PageShell
       title="eTIMS Integration"
@@ -116,53 +130,107 @@ export function ETIMS() {
       </div>
 
       {activeTab === 'invoices' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>eTIMS Invoices</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <PageState
-              state={loading ? 'loading' : invoices.length === 0 ? 'empty' : 'ready'}
-              icon="🧾"
-              title="No invoices yet"
-              description="Create your first eTIMS invoice."
-              skeletonRows={4}
-            >
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-kenya-green-100 dark:border-kenya-green-800">
-                      <th className="text-left py-3 px-3 font-medium text-gray-500">Invoice #</th>
-                      <th className="text-left py-3 px-3 font-medium text-gray-500">Customer</th>
-                      <th className="text-right py-3 px-3 font-medium text-gray-500">Amount</th>
-                      <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
-                      <th className="text-center py-3 px-3 font-medium text-gray-500">Status</th>
-                      <th className="text-center py-3 px-3 font-medium text-gray-500">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {invoices.map((inv) => (
-                      <tr key={inv.id} className="border-b border-kenya-green-50 dark:border-kenya-green-900 last:border-0 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30">
-                        <td className="py-3 px-3 font-mono text-xs text-kenya-green-700 dark:text-kenya-green-300">{inv.invoiceNumber}</td>
-                        <td className="py-3 px-3 text-kenya-green-900 dark:text-kenya-green-50">{inv.customerName}</td>
-                        <td className="py-3 px-3 text-right font-mono text-sm font-medium">{formatKES(inv.total)}</td>
-                        <td className="py-3 px-3 text-gray-600 dark:text-gray-400">{new Date(inv.createdAt).toLocaleDateString()}</td>
-                        <td className="py-3 px-3 text-center">
-                          <Badge variant={statusVariant(inv)} size="sm">{statusLabel(inv)}</Badge>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <div className="flex gap-1 justify-center">
-                            <Button variant="ghost" size="sm" onClick={() => handleSubmitToKra(inv.id)}>Submit to KRA</Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </PageState>
-          </CardContent>
-        </Card>
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+          {/* Status Summary Cards */}
+          <div className="lg:col-span-1 flex flex-col gap-3">
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total</p>
+                    <p className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50 mt-1">{invoices.length}</p>
+                  </div>
+                  <span className="text-2xl" aria-hidden="true">🧾</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-green-200 dark:border-green-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-green-600 dark:text-green-400 uppercase tracking-wide">Synced</p>
+                    <p className="text-2xl font-bold text-green-700 dark:text-green-300 mt-1">{syncedCount}</p>
+                  </div>
+                  <span className="text-2xl" aria-hidden="true">✅</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-amber-200 dark:border-amber-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wide">Pending</p>
+                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-300 mt-1">{pendingCount}</p>
+                  </div>
+                  <span className="text-2xl" aria-hidden="true">⏳</span>
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-red-200 dark:border-red-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs font-medium text-red-600 dark:text-red-400 uppercase tracking-wide">Failed</p>
+                    <p className="text-2xl font-bold text-red-700 dark:text-red-300 mt-1">{failedCount}</p>
+                  </div>
+                  <span className="text-2xl" aria-hidden="true">❌</span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Invoice Table */}
+          <div className="lg:col-span-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>eTIMS Invoices</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <PageState
+                  state={loading ? 'loading' : invoices.length === 0 ? 'empty' : 'ready'}
+                  icon="🧾"
+                  title="No invoices yet"
+                  description="Create your first eTIMS-compliant invoice to submit to KRA."
+                  action={{ label: 'Create an invoice', onClick: () => setActiveTab('create') }}
+                  skeletonRows={4}
+                >
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-kenya-green-100 dark:border-kenya-green-800">
+                          <th className="text-left py-3 px-3 font-medium text-gray-500">Invoice #</th>
+                          <th className="text-left py-3 px-3 font-medium text-gray-500">Customer</th>
+                          <th className="text-right py-3 px-3 font-medium text-gray-500">Amount</th>
+                          <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
+                          <th className="text-center py-3 px-3 font-medium text-gray-500">Status</th>
+                          <th className="text-center py-3 px-3 font-medium text-gray-500">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.map((inv) => (
+                          <tr key={inv.id} className="border-b border-kenya-green-50 dark:border-kenya-green-900 last:border-0 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30">
+                            <td className="py-3 px-3 font-mono text-xs text-kenya-green-700 dark:text-kenya-green-300">{inv.invoiceNumber}</td>
+                            <td className="py-3 px-3 text-kenya-green-900 dark:text-kenya-green-50">{inv.customerName}</td>
+                            <td className="py-3 px-3 text-right font-mono text-sm font-medium">{formatKES(inv.total)}</td>
+                            <td className="py-3 px-3 text-gray-600 dark:text-gray-400">{new Date(inv.createdAt).toLocaleDateString()}</td>
+                            <td className="py-3 px-3 text-center">
+                              <Badge variant={statusVariant(inv)} size="sm">{statusLabel(inv)}</Badge>
+                            </td>
+                            <td className="py-3 px-3 text-center">
+                              <div className="flex gap-1 justify-center">
+                                <Button variant="ghost" size="sm" onClick={() => handleSubmitToKra(inv.id)}>Submit to KRA</Button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </PageState>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       )}
 
       {activeTab === 'create' && (
@@ -204,15 +272,15 @@ export function ETIMS() {
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-kenya-green-50 p-4 dark:bg-kenya-green-900/30">
                   <span className="text-sm text-kenya-green-700 dark:text-kenya-green-300">Synced to KRA</span>
-                  <Badge variant="success">{invoices.filter((i) => i.etimsSubmission?.status === 'ACCEPTED').length}</Badge>
+                  <Badge variant="success">{syncedCount}</Badge>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-kenya-amber-50 p-4 dark:bg-kenya-amber-900/30">
                   <span className="text-sm text-kenya-amber-700 dark:text-kenya-amber-300">Pending Sync</span>
-                  <Badge variant="warning">{invoices.filter((i) => !i.etimsSubmission || i.etimsSubmission.status === 'PENDING').length}</Badge>
+                  <Badge variant="warning">{pendingCount}</Badge>
                 </div>
                 <div className="flex items-center justify-between rounded-lg bg-red-50 p-4 dark:bg-red-900/30">
                   <span className="text-sm text-red-700 dark:text-red-300">Failed Syncs</span>
-                  <Badge variant="error">{invoices.filter((i) => i.etimsSubmission?.status === 'FAILED').length}</Badge>
+                  <Badge variant="error">{failedCount}</Badge>
                 </div>
               </div>
             </CardContent>
