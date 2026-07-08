@@ -40,6 +40,10 @@ function renderConfidenceBadge(confidence: number | null | undefined) {
 export function Ledger() {
   const [search, setSearch] = React.useState('');
   const [page, setPage] = React.useState(1);
+  const [dateFrom, setDateFrom] = React.useState('');
+  const [dateTo, setDateTo] = React.useState('');
+  const [sortField, setSortField] = React.useState<string>('entryDate');
+  const [sortDir, setSortDir] = React.useState<'asc' | 'desc'>('desc');
   const [showNewEntryMenu, setShowNewEntryMenu] = React.useState(false);
   const [showIncomeForm, setShowIncomeForm] = React.useState(false);
   const [showExpenseForm, setShowExpenseForm] = React.useState(false);
@@ -56,6 +60,20 @@ export function Ledger() {
   const handleCreateSuccess = () => {
     queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
     queryClient.invalidateQueries({ queryKey: ['trial-balance'] });
+  };
+
+  const handleSort = (field: string) => {
+    if (sortField === field) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('desc');
+    }
+  };
+
+  const sortArrow = (field: string) => {
+    if (sortField !== field) return '';
+    return sortDir === 'asc' ? ' ▲' : ' ▼';
   };
 
   const handleDeleteEntry = async (id: string, description: string) => {
@@ -142,7 +160,7 @@ export function Ledger() {
       {/* Filters */}
       <Card>
         <CardContent>
-          <div className="flex flex-wrap items-center gap-4">
+          <div className="flex flex-wrap items-end gap-4">
             <div className="flex-1 min-w-[200px]">
               <Input
                 placeholder="Search entries or references..."
@@ -153,6 +171,32 @@ export function Ledger() {
                 }}
               />
             </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500 dark:text-gray-400">From</label>
+              <input
+                type="date"
+                value={dateFrom}
+                onChange={(e) => { setDateFrom(e.target.value); setPage(1); }}
+                className="touch-target h-10 rounded-lg border border-kenya-green-200 bg-white px-3 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-gray-500 dark:text-gray-400">To</label>
+              <input
+                type="date"
+                value={dateTo}
+                onChange={(e) => { setDateTo(e.target.value); setPage(1); }}
+                className="touch-target h-10 rounded-lg border border-kenya-green-200 bg-white px-3 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark"
+              />
+            </div>
+            {(dateFrom || dateTo) && (
+              <button
+                onClick={() => { setDateFrom(''); setDateTo(''); setPage(1); }}
+                className="text-xs text-kenya-green-600 hover:text-kenya-green-800 mt-auto mb-2"
+              >
+                Clear dates
+              </button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -186,11 +230,17 @@ export function Ledger() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-kenya-green-100 dark:border-kenya-green-800">
-                      <th className="text-left py-3 px-3 font-medium text-gray-500">Date</th>
-                      <th className="text-left py-3 px-3 font-medium text-gray-500">Description</th>
+                      <th className="text-left py-3 px-3 font-medium text-gray-500 cursor-pointer hover:text-kenya-green-600 select-none" onClick={() => handleSort('entryDate')}>
+                        Date{sortArrow('entryDate')}
+                      </th>
+                      <th className="text-left py-3 px-3 font-medium text-gray-500 cursor-pointer hover:text-kenya-green-600 select-none" onClick={() => handleSort('description')}>
+                        Description{sortArrow('description')}
+                      </th>
                       <th className="text-left py-3 px-3 font-medium text-gray-500">Account</th>
                       <th className="text-center py-3 px-3 font-medium text-gray-500">Confidence</th>
-                      <th className="text-right py-3 px-3 font-medium text-gray-500">Debit</th>
+                      <th className="text-right py-3 px-3 font-medium text-gray-500 cursor-pointer hover:text-kenya-green-600 select-none" onClick={() => handleSort('amount')}>
+                        Debit{sortArrow('amount')}
+                      </th>
                       <th className="text-right py-3 px-3 font-medium text-gray-500">Credit</th>
                       <th className="text-left py-3 px-3 font-medium text-gray-500">Posted By</th>
                       <th className="text-center py-3 px-3 font-medium text-gray-500">Actions</th>
