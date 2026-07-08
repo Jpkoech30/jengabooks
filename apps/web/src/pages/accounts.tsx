@@ -3,6 +3,7 @@ import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { PageState } from '../components/ui/page-state';
 import { Badge } from '../components/ui/badge';
 import { Modal } from '../components/ui/modal';
 import { PageShell } from '../components/layout/page-shell';
@@ -39,6 +40,7 @@ export function Accounts() {
   const [editingAccount, setEditingAccount] = React.useState<Account | null>(null);
   const [formData, setFormData] = React.useState({ code: '', name: '', type: 'EXPENSE', parentId: '' });
   const [saving, setSaving] = React.useState(false);
+  const [search, setSearch] = React.useState('');
 
   const invalidateAccounts = () => {
     queryClient.invalidateQueries({ queryKey: ['accounts'] });
@@ -100,6 +102,18 @@ export function Accounts() {
   }
 
   React.useEffect(() => { loadAccounts(); }, []);
+
+  // Client-side search across code and name
+  const filteredAccounts = search
+    ? accounts.filter(
+        (a) =>
+          a.code.toLowerCase().includes(search.toLowerCase()) ||
+          a.name.toLowerCase().includes(search.toLowerCase()),
+      )
+    : accounts;
+  const filteredRootAccounts = filteredAccounts.filter((a) => !a.parentId);
+  const filteredGetChildren = (parentId: string) =>
+    filteredAccounts.filter((a) => a.parentId === parentId);
 
   const openEdit = (account: Account) => {
     setEditingAccount(account);
@@ -178,7 +192,7 @@ export function Accounts() {
           </div>
         </td>
       </tr>
-      {getChildren(account.id).map((child) => renderAccountRow(child, depth + 1))}
+      {filteredGetChildren(account.id).map((child) => renderAccountRow(child, depth + 1))}
     </React.Fragment>
   );
 
@@ -265,7 +279,16 @@ export function Accounts() {
       {/* Accounts Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Accounts ({accounts.length})</CardTitle>
+          <div className="flex items-center justify-between w-full gap-3">
+            <CardTitle className="shrink-0">All Accounts ({filteredAccounts.length})</CardTitle>
+            <div className="flex-1 max-w-xs">
+              <Input
+                placeholder="Search by code or name..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <PageState
@@ -287,7 +310,7 @@ export function Accounts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {rootAccounts.map((account) => renderAccountRow(account))}
+                  {filteredRootAccounts.map((account) => renderAccountRow(account))}
                 </tbody>
               </table>
             </div>
