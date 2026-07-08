@@ -550,6 +550,21 @@ model Comment {
   @@map("comments")
 }
 
+model Subscription {
+  id                 String    @id @default(uuid())
+  companyId          String    @unique
+  tier               String    // STARTER, PRO, ENTERPRISE, ACCOUNTANT_PRACTICE
+  status             String    @default("TRIAL") // TRIAL, ACTIVE, EXPIRED, CANCELLED
+  trialEndsAt        DateTime?
+  currentPeriodStart DateTime  @default(now())
+  currentPeriodEnd   DateTime?
+  cancelledAt        DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  @@map("subscriptions")
+}
+
 /// Auto-generated tasks assigned to clients or team members.
 /// Kept even if the referenced client/user is deleted â€” orphaned tasks are marked SKIPPED.
 model ClientTask {

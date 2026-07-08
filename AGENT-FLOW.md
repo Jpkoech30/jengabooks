@@ -241,3 +241,53 @@
 - GROUNDING: Followed existing Prisma schema patterns (snake_case `@@map`, uuid IDs, `companyId`+`Company` relation, compound indexes)
 - UNIT TEST: Schema-level task — no service layer to test; migration SQL is declarative DDL
 
+## Sprint 11.2 — Predictive Cash Flow Alerts
+
+**Commit:** `a6a0982` — `feat(cashflow): add predictive cash flow forecasting engine with alerts`
+
+### Files Changed
+| File | Change | Purpose |
+|------|--------|---------|
+| **NEW** [`apps/api/src/modules/cashflow/cashflow.module.ts`](jengabooks/apps/api/src/modules/cashflow/cashflow.module.ts) | New file | Cashflow module registration |
+| **NEW** [`apps/api/src/modules/cashflow/cashflow.service.ts`](jengabooks/apps/api/src/modules/cashflow/cashflow.service.ts) | New file | Core forecasting engine with pattern recognition, projection, alert generation |
+| **NEW** [`apps/api/src/modules/cashflow/cashflow.controller.ts`](jengabooks/apps/api/src/modules/cashflow/cashflow.controller.ts) | New file | `GET /forecast` and `GET /insights` endpoints |
+| **NEW** [`apps/api/src/modules/cashflow/cashflow.service.spec.ts`](jengabooks/apps/api/src/modules/cashflow/cashflow.service.spec.ts) | New file | 11 unit tests covering all scenarios |
+| [`apps/api/src/app.module.ts`](jengabooks/apps/api/src/app.module.ts) | Modified | Registered `CashflowModule` |
+
+### Architecture
+
+**Pattern Recognition Heuristic:**
+1. Groups ledger entries by normalized description (vendor prefix matching ±20% amount)
+2. Removes statistical outliers (|value - mean| > 2×stdDev)
+3. Detects recurring bills/income when same day-of-month appears for ≥3 distinct months
+4. Calculates seasonal factors by month-over-month spending comparison
+
+**Forecast Engine:**
+1. Queries DB `NOW()` as single temporal reference (TIME-TRAVEL compliance)
+2. Projects recurring bills/income forward N months with seasonal adjustment
+3. Applies invoice payment delay (average days-to-payment per client) to income timing
+4. Determines confidence: `HIGH` (≥3 bill + ≥2 income patterns), `MEDIUM` (≥1 pattern), `LOW` (<3 months data)
+
+**Alert Rules:**
+1. Low cash: projected balance < KSh 50,000
+2. Bill cluster: weekly bill total > 50% of current balance
+3. Payment delay: recurring bill past due date + 3 grace days (via DB comparison)
+4. Income shortfall: projected income < expenses for 2+ consecutive months
+5. Large transaction pattern: threshold check (deferred — informational)
+
+### API Endpoints
+- `GET /api/v1/cashflow/forecast?companyId=xxx&months=3` — Returns 3-month forecast with recurring bills, income, alerts, next low point
+- `GET /api/v1/cashflow/insights?companyId=xxx` — Returns averages, runway, top expense categories, invoice payment stats
+
+### Edge Cases Handled
+- Zero transactions → empty forecast + empty alerts
+- <3 months data → LOW confidence, limited alerts
+- No recurring patterns → basic average-based projection
+- Extreme outliers → auto-detected via 2×stdDev and excluded from patterns
+- Starting balance < 0 → floor at 0 in closing balance
+
+### Compliance Checks
+- **SENTINEL**: No TODO, FIXME, MISSING_API_DATA, invented endpoints, fake response shapes, hardcoded secrets
+- **TIME-TRAVEL**: All temporal references use `SELECT NOW()` via `$queryRaw`; no `new Date()` or `Date.now()` in financial calculations. Dates come from ledger `entryDate` / invoice `dueDate` / `paidAt` columns
+- **FEATURE-CREEP**: Only 5 files changed — all within spec
+- **GROUNDING**: Read `.project-context.json`, `CLAUDE.md`, schema.prisma, dashboard module (service/controller/module), wizard module, app.module.ts before coding

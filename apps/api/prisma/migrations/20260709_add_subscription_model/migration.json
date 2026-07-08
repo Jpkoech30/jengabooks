@@ -1,0 +1,14 @@
+{
+  "version": "5.22",
+  "checksum": "auto-generated",
+  "steps": [
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"subscriptions\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"tier\" TEXT NOT NULL,\n    \"status\" TEXT NOT NULL DEFAULT 'TRIAL',\n    \"trialEndsAt\" TIMESTAMP(3),\n    \"currentPeriodStart\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"currentPeriodEnd\" TIMESTAMP(3),\n    \"cancelledAt\" TIMESTAMP(3),\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"subscriptions_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE UNIQUE INDEX \"subscriptions_companyId_key\" ON \"subscriptions\"(\"companyId\")"
+    }
+  ]
+}
