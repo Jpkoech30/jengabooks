@@ -178,3 +178,37 @@ export interface AuthProfile {
   name: string;
   memberships: Array<{ companyId: string; companyName: string; role: string }>;
 }
+
+// ─── Collaboration: Notifications ─────────────────────────────────────────
+
+export type NotificationType = 'MENTION' | 'DEADLINE' | 'STATUS_CHANGE' | 'BANK_FEED' | 'TASK_ASSIGNED' | 'SYSTEM';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  link?: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+// ─── Collaboration: Tasks ─────────────────────────────────────────────────
+
+export type TaskPriority = 'HIGH' | 'MEDIUM' | 'LOW';
+export type TaskStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'OVERDUE';
+
+export interface CollaborationTask {
+  id: string;
+  title: string;
+  description?: string | null;
+  clientName?: string | null;
+  priority: TaskPriority;
+  status: TaskStatus;
+  category?: string | null;
+  dueDate?: string | null;
+  assignedTo?: string | null;
+  assignedUser?: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}

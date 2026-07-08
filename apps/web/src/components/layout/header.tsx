@@ -2,7 +2,9 @@ import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth-store';
-import { useGamificationProfile } from '../../hooks/use-api';
+import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from '../../hooks/use-api';
+import { timeAgo } from '../../lib/utils';
+import type { Notification, NotificationType } from '../../lib/types';
 
 interface HeaderProps {
   onToggleSidebar?: () => void;
@@ -20,18 +22,46 @@ const PAGE_TITLES: Record<string, string> = {
   '/team': 'Team',
   '/settings': 'Settings',
   '/help': 'Help & Support',
+  '/tasks': 'Tasks',
 };
+
+const NOTIFICATION_ICONS: Record<NotificationType, string> = {
+  MENTION: '📝',
+  DEADLINE: '⏰',
+  STATUS_CHANGE: '🔄',
+  BANK_FEED: '🔴',
+  TASK_ASSIGNED: '📋',
+  SYSTEM: '🔔',
+};
+
+/** Click-outside hook for dropdowns */
+function useClickOutside(ref: React.RefObject<HTMLElement | null>, handler: () => void) {
+  React.useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        handler();
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [ref, handler]);
+}
 
 export function Header({ onToggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const queryClient = useQueryClient();
   const [showProfileMenu, setShowProfileMenu] = React.useState(false);
+  const [showNotifications, setShowNotifications] = React.useState(false);
   const [showCompanySwitcher, setShowCompanySwitcher] = React.useState(false);
   const user = useAuthStore((state) => state.user);
   const logout = useAuthStore((state) => state.logout);
   const switchCompany = useAuthStore((state) => state.switchCompany);
-  const { data: gamification } = useGamificationProfile();
+
+  // Notifications
+  const { data: notifications = [], isLoading: notifLoading } = useNotifications('UNREAD');
+  const markRead = useMarkNotificationRead();
+  const markAllRead = useMarkAllNotificationsRead();
 
   const currentPath = '/' + location.pathname.split('/').filter(Boolean)[0];
   const pageTitle = PAGE_TITLES[currentPath] || 'Dashboard';
@@ -41,15 +71,21 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const currentCompanyId = user?.companyId;
   const currentCompanyName = user?.companyName;
 
-  const recentActivity = gamification?.recentActivity || [];
-  const hasNotifications = recentActivity.length > 0;
-
   const userInitials = user?.name
     ?.split(' ')
     .map((n) => n[0])
     .join('')
     .toUpperCase()
     .substring(0, 2) || '?';
+
+  // Refs for click-outside handling
+  const notifRef = React.useRef<HTMLDivElement>(null);
+  const profileRef = React.useRef<HTMLDivElement>(null);
+  const companyRef = React.useRef<HTMLDivElement>(null);
+
+  useClickOutside(notifRef, () => setShowNotifications(false));
+  useClickOutside(profileRef, () => setShowProfileMenu(false));
+  useClickOutside(companyRef, () => setShowCompanySwitcher(false));
 
   const handleLogout = () => {
     logout();
@@ -65,15 +101,20 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     }
   };
 
-  React.useEffect(() => {
-    if (!showProfileMenu && !showCompanySwitcher) return;
-    const handleClick = () => {
-      setShowProfileMenu(false);
-      setShowCompanySwitcher(false);
-    };
-    document.addEventListener('click', handleClick);
-    return () => document.removeEventListener('click', handleClick);
-  }, [showProfileMenu, showCompanySwitcher]);
+  const handleNotificationClick = (notification: Notification) => {
+    markRead.mutate(notification.id);
+    setShowNotifications(false);
+    if (notification.link) {
+      navigate(notification.link);
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    markAllRead.mutate();
+    setShowNotifications(false);
+  };
+
+  const unreadCount = notifications.length;
 
   return (
     <header className="flex h-16 items-center justify-between border-b border-kenya-gray-200 bg-white px-6 dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
@@ -91,14 +132,14 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </h2>
       </div>
 
-      {/* Right: [company switcher] [notifications + profile menu] */}
+      {/* Right: [company switcher] [notifications] [profile menu] */}
       <div className="flex items-center gap-3">
         {/* Company Switcher */}
-        <div className="relative">
+        <div ref={companyRef} className="relative">
           {hasMultipleCompanies ? (
             <>
               <button
-                onClick={(e) => { e.stopPropagation(); setShowCompanySwitcher(!showCompanySwitcher); setShowProfileMenu(false); }}
+                onClick={() => { setShowCompanySwitcher(!showCompanySwitcher); setShowProfileMenu(false); setShowNotifications(false); }}
                 className="touch-target flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-kenya-gray-700 hover:bg-kenya-gray-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900"
                 aria-label={`Switch company (current: ${currentCompanyName || 'None'})`}
                 aria-expanded={showCompanySwitcher}
@@ -159,18 +200,117 @@ export function Header({ onToggleSidebar }: HeaderProps) {
           )}
         </div>
 
-        {/* Unified Profile Menu (Notifications + User) */}
-        <div className="relative">
+        {/* Notification Bell */}
+        <div ref={notifRef} className="relative">
           <button
-            onClick={(e) => { e.stopPropagation(); setShowProfileMenu(!showProfileMenu); setShowCompanySwitcher(false); }}
+            onClick={() => { setShowNotifications(!showNotifications); setShowProfileMenu(false); setShowCompanySwitcher(false); }}
+            className="touch-target relative flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-kenya-gray-50 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900"
+            aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+            aria-expanded={showNotifications}
+            aria-haspopup="true"
+          >
+            <span className="text-lg leading-none" aria-hidden="true">🔔</span>
+            {unreadCount > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-kenya-surface-dark">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          {/* Notification Dropdown */}
+          {showNotifications && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute right-0 top-full mt-2 z-50 w-[380px] rounded-xl border border-kenya-gray-200 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-kenya-gray-200 dark:border-kenya-green-800">
+                <p className="text-sm font-semibold text-kenya-gray-900 dark:text-kenya-green-50">
+                  Notifications
+                </p>
+                {unreadCount > 0 && (
+                  <button
+                    onClick={handleMarkAllRead}
+                    className="text-xs font-medium text-kenya-green-600 hover:text-kenya-green-700 dark:text-kenya-green-400 dark:hover:text-kenya-green-300 transition-colors"
+                  >
+                    ✓ All
+                  </button>
+                )}
+              </div>
+
+              {/* Loading state */}
+              {notifLoading && (
+                <div className="px-4 py-8 text-center">
+                  <div className="mx-auto mb-3 h-8 w-8 animate-spin rounded-full border-2 border-kenya-green-500 border-t-transparent" />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">Loading notifications...</p>
+                </div>
+              )}
+
+              {/* Zero state */}
+              {!notifLoading && unreadCount === 0 && (
+                <div className="flex flex-col items-center px-4 py-8 text-center">
+                  <span className="mb-2 text-2xl" aria-hidden="true">🔔</span>
+                  <p className="text-sm font-medium text-kenya-gray-900 dark:text-kenya-green-50">
+                    No notifications
+                  </p>
+                  <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                    You're all caught up!
+                  </p>
+                </div>
+              )}
+
+              {/* Notification list (last 5) */}
+              {!notifLoading && unreadCount > 0 && (
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.slice(0, 5).map((notification) => (
+                    <button
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className="touch-target flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-kenya-gray-50 dark:hover:bg-kenya-green-900/30 transition-colors border-b border-kenya-gray-100 dark:border-kenya-green-800/50 last:border-0"
+                    >
+                      <span className="mt-0.5 text-base shrink-0" aria-hidden="true">
+                        {NOTIFICATION_ICONS[notification.type] || '🔔'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-kenya-gray-900 dark:text-kenya-green-50 truncate">
+                          {notification.title}
+                        </p>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2 mt-0.5">
+                          {notification.message}
+                        </p>
+                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">
+                          {timeAgo(notification.createdAt)}
+                        </p>
+                      </div>
+                      <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-kenya-green-500" aria-hidden="true" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* View all link */}
+              <div className="border-t border-kenya-gray-200 dark:border-kenya-green-800 py-1">
+                <button
+                  onClick={() => { navigate('/tasks'); setShowNotifications(false); }}
+                  className="touch-target flex w-full items-center justify-center gap-1 px-4 py-2.5 text-sm font-medium text-kenya-green-600 hover:bg-kenya-gray-50 dark:text-kenya-green-400 dark:hover:bg-kenya-green-900/30 transition-colors"
+                >
+                  <span>View all notifications</span>
+                  <span aria-hidden="true">→</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Profile Menu */}
+        <div ref={profileRef} className="relative">
+          <button
+            onClick={() => { setShowProfileMenu(!showProfileMenu); setShowNotifications(false); setShowCompanySwitcher(false); }}
             className="touch-target flex items-center gap-2 rounded-lg border border-kenya-gray-200 bg-white px-3 py-1.5 hover:bg-kenya-gray-50 dark:border-kenya-green-800 dark:bg-kenya-surface-dark dark:hover:bg-kenya-green-900"
             aria-label={`Profile menu${user?.name ? ' (' + user.name + ')' : ''}`}
             aria-expanded={showProfileMenu}
             aria-haspopup="true"
           >
-            {hasNotifications && (
-              <span className="text-lg leading-none" aria-hidden="true">🔔</span>
-            )}
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-kenya-green-100 text-xs font-bold text-kenya-green-700 dark:bg-kenya-green-800 dark:text-kenya-green-300">
               {userInitials}
             </span>
@@ -181,26 +321,6 @@ export function Header({ onToggleSidebar }: HeaderProps) {
               onClick={(e) => e.stopPropagation()}
               className="absolute right-0 top-full mt-2 z-50 w-80 rounded-xl border border-kenya-gray-200 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden"
             >
-              {hasNotifications && (
-                <>
-                  <div className="px-4 py-3 border-b border-kenya-gray-200 dark:border-kenya-green-800">
-                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notifications</p>
-                  </div>
-                  <div className="py-1 max-h-48 overflow-y-auto">
-                    {recentActivity.slice(0, 5).map((activity, i) => (
-                      <div
-                        key={i}
-                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-kenya-gray-900 dark:text-kenya-green-50 hover:bg-kenya-gray-50 dark:hover:bg-kenya-green-900/30"
-                      >
-                        <span className="text-xs font-medium text-amber-700 shrink-0">+{activity.points} XP</span>
-                        <span className="text-xs text-gray-600 dark:text-gray-400">{activity.reason}</span>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="border-t border-kenya-gray-200 dark:border-kenya-green-800" />
-                </>
-              )}
-
               <div className="px-4 py-4 border-b border-kenya-gray-200 dark:border-kenya-green-800">
                 <p className="text-sm font-semibold text-kenya-gray-900 dark:text-kenya-green-50 truncate">
                   {user?.name || 'User'}

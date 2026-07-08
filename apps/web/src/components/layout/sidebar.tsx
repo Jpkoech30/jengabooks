@@ -31,6 +31,7 @@ const sections: NavSection[] = [
       { to: '/', label: 'Dashboard', icon: '📊' },
       { to: '/ledger', label: 'Ledger', icon: '📒' },
       { to: '/accounts', label: 'Accounts', icon: '📋' },
+      { to: '/tasks', label: 'Tasks', icon: '✅' },
     ],
   },
   {

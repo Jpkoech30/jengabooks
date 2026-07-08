@@ -15,6 +15,8 @@ import type {
   HealthScore,
   WizardProgress,
   CompanyMember,
+  Notification,
+  CollaborationTask,
 } from '../lib/types';
 
 // ─── Ledger ─────────────────────────────────────────────────────────────
@@ -243,5 +245,104 @@ export function usePayrollRun(id: string | null) {
 export function useCalculatePay() {
   return useMutation<CalculatePayResponse, Error, { basicSalary: number; housingAllowance: number }>({
     mutationFn: (data) => api.post('/payroll/calculate', data),
+  });
+}
+
+// ─── Collaboration: Notifications ──────────────────────────────────────────
+
+export function useNotifications(status?: 'UNREAD' | 'ALL') {
+  return useQuery<Notification[]>({
+    queryKey: ['notifications', status],
+    queryFn: () => api.get('/collab/notifications', { userId: 'me', status: status || 'UNREAD' }),
+    refetchInterval: 30_000, // Poll every 30s for new notifications
+  });
+}
+
+export function useUnreadCount() {
+  return useQuery<{ count: number }>({
+    queryKey: ['notifications', 'unread-count'],
+    queryFn: () => api.get('/collab/notifications/count', { userId: 'me' }),
+    refetchInterval: 30_000,
+  });
+}
+
+export function useMarkNotificationRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.patch(`/collab/notifications/${id}/read`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to mark as read', err?.response?.data?.message || 'Please try again');
+    },
+  });
+}
+
+export function useMarkAllNotificationsRead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/collab/notifications/mark-all-read'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['notifications'] });
+      qc.invalidateQueries({ queryKey: ['notifications', 'unread-count'] });
+      showToast('success', 'All notifications marked as read');
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to mark all as read', err?.response?.data?.message || 'Please try again');
+    },
+  });
+}
+
+// ─── Collaboration: Tasks ──────────────────────────────────────────────────
+
+export function useCollaborationTasks(params?: { status?: string; search?: string }) {
+  return useQuery<CollaborationTask[]>({
+    queryKey: ['collab-tasks', params],
+    queryFn: () => api.get('/collab/tasks', params as Record<string, unknown>),
+  });
+}
+
+export function useUpdateTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Pick<CollaborationTask, 'status' | 'priority' | 'assignedTo'>> }) =>
+      api.patch(`/collab/tasks/${id}`, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collab-tasks'] });
+      showToast('success', 'Task updated', 'The task has been updated successfully');
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to update task', err?.response?.data?.message || 'Please try again');
+    },
+  });
+}
+
+export function useGenerateTasks() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api.post('/collab/tasks/generate'),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collab-tasks'] });
+      showToast('success', 'Tasks generated', 'New tasks have been generated successfully');
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to generate tasks', err?.response?.data?.message || 'Please try again');
+    },
+  });
+}
+
+export function useEscalateTask() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api.post(`/collab/tasks/${id}/escalate`),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['collab-tasks'] });
+      showToast('success', 'Task escalated', 'The task has been escalated');
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to escalate task', err?.response?.data?.message || 'Please try again');
+    },
   });
 }
