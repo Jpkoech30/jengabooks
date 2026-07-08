@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthStore } from '../../stores/auth-store';
 import { useGamificationProfile } from '../../hooks/use-api';
@@ -8,8 +8,23 @@ interface HeaderProps {
   onToggleSidebar?: () => void;
 }
 
+const PAGE_TITLES: Record<string, string> = {
+  '/': 'Dashboard',
+  '/ledger': 'General Ledger',
+  '/accounts': 'Chart of Accounts',
+  '/etims': 'eTIMS Integration',
+  '/mpesa': 'M-Pesa Import',
+  '/hitl': 'HITL Hub',
+  '/reports': 'Reports',
+  '/workflow': 'Monthly Workflow',
+  '/team': 'Team',
+  '/settings': 'Settings',
+  '/help': 'Help & Support',
+};
+
 export function Header({ onToggleSidebar }: HeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [showNotifications, setShowNotifications] = React.useState(false);
   const [showUserMenu, setShowUserMenu] = React.useState(false);
@@ -18,6 +33,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
   const logout = useAuthStore((state) => state.logout);
   const switchCompany = useAuthStore((state) => state.switchCompany);
   const { data: gamification } = useGamificationProfile();
+
+  // Determine page title from current path
+  const currentPath = '/' + location.pathname.split('/').filter(Boolean)[0];
+  const pageTitle = PAGE_TITLES[currentPath] || 'Dashboard';
 
   const unreadCount = 0;
   const xpProgress = gamification ? Math.round((gamification.score / (gamification.score + gamification.xpToNextLevel)) * 100) : 0;
@@ -70,10 +89,10 @@ export function Header({ onToggleSidebar }: HeaderProps) {
         </button>
         <div>
           <h2 className="text-lg font-semibold text-kenya-green-900 dark:text-kenya-green-50">
-            Welcome{user?.name ? `, ${user.name.split(' ')[0]}` : ' back'}
+            {pageTitle}
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            {new Date().toLocaleDateString('en-KE', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            {user?.companyName || 'JengaBooks'}
           </p>
         </div>
       </div>
