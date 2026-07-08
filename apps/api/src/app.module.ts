@@ -24,6 +24,7 @@ import { PracticeModule } from './modules/practice/practice.module';
 import { CollaborationModule } from './modules/collaboration/collaboration.module';
 import { DocumentsModule } from './modules/documents/documents.module';
 import { AuditModule } from './modules/audit/audit.module';
+import { CashflowModule } from './modules/cashflow/cashflow.module';
 
 @Module({
   imports: [
@@ -62,6 +63,7 @@ import { AuditModule } from './modules/audit/audit.module';
     CollaborationModule,
     DocumentsModule,
     AuditModule,
+    CashflowModule,
   ],
   providers: [
     {
