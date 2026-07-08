@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { PageShell } from '../components/layout/page-shell';
+import { PageState } from '../components/ui/page-state';
 import { api } from '../lib/api-client';
 
 interface PhaseData {
@@ -111,7 +112,7 @@ export function Workflow() {
   }, []);
 
   if (loading) {
-    return <div className="flex justify-center py-12"><p className="text-gray-500">Loading workflow...</p></div>;
+    return <PageState state="loading" skeletonRows={4} />;
   }
 
   const statusColors = {

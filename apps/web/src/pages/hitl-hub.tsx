@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Modal } from '../components/ui/modal';
 import { PageShell } from '../components/layout/page-shell';
+import { PageState } from '../components/ui/page-state';
 import { XPBar } from '../components/ui/xp-bar';
 import { useCompanyRefresh } from '../hooks/use-company-refresh';
 import { showToast } from '../stores/ui-store';
@@ -173,7 +174,7 @@ export function HitlHub() {
   };
 
   if (loading) {
-    return <div className="flex justify-center py-12"><p className="text-gray-500">Loading HITL hub...</p></div>;
+    return <PageState state="loading" skeletonRows={3} />;
   }
 
   return (

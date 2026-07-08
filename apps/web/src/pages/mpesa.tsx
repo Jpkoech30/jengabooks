@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/badge';
 import { FileUpload } from '../components/ui/file-upload';
 import { Modal } from '../components/ui/modal';
 import { PageShell } from '../components/layout/page-shell';
+import { PageState } from '../components/ui/page-state';
 import { api, apiClient } from '../lib/api-client';
 import { showToast } from '../stores/ui-store';
 
@@ -208,14 +209,13 @@ export function MpesaImport() {
           </div>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="py-12 text-center"><p className="text-gray-500">Loading transactions...</p></div>
-          ) : transactions.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-3xl mb-2">📄</p>
-              <p className="text-gray-500 dark:text-gray-400">No imported transactions yet. Upload a CSV/PDF to get started.</p>
-            </div>
-          ) : (
+          <PageState
+            state={loading ? 'loading' : transactions.length === 0 ? 'empty' : 'ready'}
+            icon="📄"
+            title="No transactions yet"
+            description="Upload a CSV or PDF statement to get started."
+            skeletonRows={5}
+          >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -300,7 +300,7 @@ export function MpesaImport() {
                 </tbody>
               </table>
             </div>
-          )}
+          </PageState>
         </CardContent>
       </Card>
 

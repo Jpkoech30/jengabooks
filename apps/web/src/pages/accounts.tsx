@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { Modal } from '../components/ui/modal';
 import { PageShell } from '../components/layout/page-shell';
+import { PageState } from '../components/ui/page-state';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
 
@@ -249,14 +250,13 @@ export function Accounts() {
           <CardTitle>All Accounts ({accounts.length})</CardTitle>
         </CardHeader>
         <CardContent>
-          {loading ? (
-            <div className="py-12 text-center"><p className="text-gray-500">Loading accounts...</p></div>
-          ) : accounts.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-3xl mb-2" aria-hidden="true">📒</p>
-              <p className="text-gray-500 dark:text-gray-400">No accounts yet. Create your first account to get started.</p>
-            </div>
-          ) : (
+          <PageState
+            state={loading ? 'loading' : accounts.length === 0 ? 'empty' : 'ready'}
+            icon="📒"
+            title="No accounts yet"
+            description="Create your first account to get started."
+            skeletonRows={5}
+          >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -273,7 +273,7 @@ export function Accounts() {
                 </tbody>
               </table>
             </div>
-          )}
+          </PageState>
         </CardContent>
       </Card>
     </PageShell>

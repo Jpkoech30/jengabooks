@@ -5,6 +5,7 @@ import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { PageShell } from '../components/layout/page-shell';
+import { PageState } from '../components/ui/page-state';
 import { api } from '../lib/api-client';
 
 interface Invoice {
@@ -120,11 +121,13 @@ export function ETIMS() {
             <CardTitle>eTIMS Invoices</CardTitle>
           </CardHeader>
           <CardContent>
-            {loading ? (
-              <div className="py-12 text-center"><p className="text-gray-500">Loading invoices...</p></div>
-            ) : invoices.length === 0 ? (
-              <div className="py-12 text-center"><p className="text-gray-400">No invoices yet. Create your first one.</p></div>
-            ) : (
+            <PageState
+              state={loading ? 'loading' : invoices.length === 0 ? 'empty' : 'ready'}
+              icon="🧾"
+              title="No invoices yet"
+              description="Create your first eTIMS invoice."
+              skeletonRows={4}
+            >
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -157,7 +160,7 @@ export function ETIMS() {
                   </tbody>
                 </table>
               </div>
-            )}
+            </PageState>
           </CardContent>
         </Card>
       )}
