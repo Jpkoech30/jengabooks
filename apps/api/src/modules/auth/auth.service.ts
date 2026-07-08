@@ -85,6 +85,42 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(data.password, 10);
 
     // Create user, company, and membership in a transaction
+    // Default chart of accounts for new companies
+    const DEFAULT_ACCOUNTS = [
+      { code: '1000', name: 'Cash', type: 'ASSET' },
+      { code: '1100', name: 'M-Pesa', type: 'ASSET' },
+      { code: '1200', name: 'Bank Account', type: 'ASSET' },
+      { code: '1300', name: 'Accounts Receivable', type: 'ASSET' },
+      { code: '1400', name: 'Inventory', type: 'ASSET' },
+      { code: '2000', name: 'Accounts Payable', type: 'LIABILITY' },
+      { code: '3000', name: 'Owner Equity', type: 'EQUITY' },
+      { code: '4000', name: 'Sales Revenue', type: 'INCOME' },
+      { code: '4100', name: 'Consulting Income', type: 'INCOME' },
+      { code: '5000', name: 'Cost of Goods Sold', type: 'EXPENSE' },
+      { code: '6000', name: 'Operating Expenses', type: 'EXPENSE' },
+      { code: '6100', name: 'Rent & Utilities', type: 'EXPENSE' },
+      { code: '6200', name: 'Salaries & Wages', type: 'EXPENSE' },
+    ];
+
+    // Default categorization rules (keyword → account mapping)
+    const DEFAULT_RULES = [
+      { keyword: 'rent', accountCode: '6100', priority: 10 },
+      { keyword: 'salary', accountCode: '6200', priority: 10 },
+      { keyword: 'wages', accountCode: '6200', priority: 10 },
+      { keyword: 'electricity', accountCode: '6100', priority: 8 },
+      { keyword: 'water', accountCode: '6100', priority: 8 },
+      { keyword: 'consulting', accountCode: '4100', priority: 10 },
+      { keyword: 'consultation', accountCode: '4100', priority: 10 },
+      { keyword: 'M-PESA', accountCode: '1100', priority: 5 },
+      { keyword: 'mpesa', accountCode: '1100', priority: 5 },
+      { keyword: 'inventory', accountCode: '1400', priority: 5 },
+      { keyword: 'stock', accountCode: '1400', priority: 5 },
+      { keyword: 'sales', accountCode: '4000', priority: 10 },
+      { keyword: 'utilities', accountCode: '6100', priority: 5 },
+      { keyword: 'airtime', accountCode: '6000', priority: 5 },
+      { keyword: 'withdraw', accountCode: '1200', priority: 5 },
+    ];
+
     const result = await this.prisma.$transaction(async (tx) => {
       const user = await tx.user.create({
         data: {
@@ -109,6 +145,22 @@ export class AuthService {
         },
         include: { company: true },
       });
+
+      // Seed default chart of accounts
+      for (const acct of DEFAULT_ACCOUNTS) {
+        await tx.chartOfAccount.upsert({
+          where: { companyId_code: { companyId: company.id, code: acct.code } },
+          update: {},
+          create: { companyId: company.id, ...acct },
+        });
+      }
+
+      // Seed default category rules
+      for (const rule of DEFAULT_RULES) {
+        await tx.categoryRule.create({
+          data: { companyId: company.id, ...rule },
+        });
+      }
 
       return { user, membership };
     });

@@ -112,12 +112,13 @@ export class MpesaService {
     customerName?: string;
     transactionType?: string;
   }>, source: string) {
-    // Deduplicate: check which receipt numbers already exist
-    const existingReceipts = new Set<string>();
     const receiptNos = transactions
       .map(t => t.receiptNo)
       .filter((r): r is string => !!r);
 
+    // Check if ALL transactions might be duplicates before entering the serializable transaction
+    // (This early check is an optimization to avoid unnecessary serializable transactions)
+    let existingReceipts = new Set<string>();
     if (receiptNos.length > 0) {
       const existing = await this.prisma.mpesaTransaction.findMany({
         where: { companyId, receiptNo: { in: receiptNos } },
@@ -126,31 +127,56 @@ export class MpesaService {
       existing.forEach(t => { if (t.receiptNo) existingReceipts.add(t.receiptNo); });
     }
 
-    const newTx = transactions.filter(t => !t.receiptNo || !existingReceipts.has(t.receiptNo));
-    const duplicates = transactions.length - newTx.length;
+    const initialFiltered = transactions.filter(t => !t.receiptNo || !existingReceipts.has(t.receiptNo));
+    let duplicates = transactions.length - initialFiltered.length;
 
-    if (newTx.length === 0) {
+    if (initialFiltered.length === 0) {
       return { imported: 0, categorized: 0, duplicates, source, message: `All ${duplicates} transactions were already imported` };
     }
 
-    const parsedRows = newTx.map((tx) => ({
-      companyId,
-      receiptNo: tx.receiptNo || null,
-      transactionDate: tx.transactionDate,
-      description: tx.description,
-      amount: tx.amount,
-      paidIn: tx.paidIn || 0,
-      withdrawn: tx.withdrawn || 0,
-      phoneNumber: tx.phoneNumber || null,
-      paybill: tx.paybill || null,
-      customerName: tx.customerName || null,
-      transactionType: tx.transactionType || null,
-      rawCsv: JSON.stringify({ source, ...tx }),
-    }));
+    // Use serializable transaction to prevent race conditions from concurrent uploads
+    const result = await this.prisma.$transaction(async (tx) => {
+      // Re-check inside the transaction to prevent race conditions
+      const txExistingReceipts = new Set<string>();
+      if (receiptNos.length > 0) {
+        const existing = await tx.mpesaTransaction.findMany({
+          where: { companyId, receiptNo: { in: receiptNos } },
+          select: { receiptNo: true },
+        });
+        existing.forEach(t => { if (t.receiptNo) txExistingReceipts.add(t.receiptNo); });
+      }
 
-    const created = await this.prisma.mpesaTransaction.createManyAndReturn({
-      data: parsedRows,
-    });
+      const newTx = transactions.filter(t => !t.receiptNo || !txExistingReceipts.has(t.receiptNo));
+      const txDuplicates = transactions.length - newTx.length;
+
+      if (newTx.length === 0) {
+        return { created: null as any, txDuplicates };
+      }
+
+      const parsedRows = newTx.map((tx) => ({
+        companyId,
+        receiptNo: tx.receiptNo || null,
+        transactionDate: tx.transactionDate,
+        description: tx.description,
+        amount: tx.amount,
+        paidIn: tx.paidIn || 0,
+        withdrawn: tx.withdrawn || 0,
+        phoneNumber: tx.phoneNumber || null,
+        paybill: tx.paybill || null,
+        customerName: tx.customerName || null,
+        transactionType: tx.transactionType || null,
+        rawCsv: JSON.stringify({ source, ...tx }),
+      }));
+
+      const created = await tx.mpesaTransaction.createManyAndReturn({
+        data: parsedRows,
+      });
+
+      return { created, txDuplicates };
+    }, { isolationLevel: 'Serializable' });
+
+    duplicates = result.txDuplicates;
+    const created = result.created;
 
     // Auto-categorize using rules
     const categorized = await this.autoCategorize(companyId, created, userId);

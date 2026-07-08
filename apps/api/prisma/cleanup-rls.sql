@@ -1,0 +1,20 @@
+-- Drop broken policies from first attempt (they used app.current_company_id() which failed)
+DROP POLICY IF EXISTS tenant_isolation ON companies;
+DROP POLICY IF EXISTS tenant_isolation ON company_members;
+DROP POLICY IF EXISTS tenant_isolation ON chart_of_accounts;
+DROP POLICY IF EXISTS tenant_isolation ON journal_entries;
+DROP POLICY IF EXISTS tenant_isolation ON fiscal_periods;
+DROP POLICY IF EXISTS tenant_isolation ON invoices;
+DROP POLICY IF EXISTS tenant_isolation ON mpesa_transactions;
+DROP POLICY IF EXISTS tenant_isolation ON bank_transactions;
+DROP POLICY IF EXISTS tenant_isolation ON category_rules;
+DROP POLICY IF EXISTS tenant_isolation ON pending_reviews;
+DROP POLICY IF EXISTS tenant_isolation ON xp_records;
+DROP POLICY IF EXISTS tenant_isolation ON user_levels;
+DROP POLICY IF EXISTS tenant_isolation ON business_health_scores;
+DROP POLICY IF EXISTS tenant_isolation ON ai_feedback_logs;
+DROP POLICY IF EXISTS tenant_isolation ON sync_logs;
+DROP POLICY IF EXISTS tenant_isolation ON audit_logs;
+DROP POLICY IF EXISTS tenant_isolation ON wizard_progress;
+DROP POLICY IF EXISTS tenant_isolation ON statement_uploads;
+DROP POLICY IF EXISTS tenant_isolation ON parsing_templates;
