@@ -4,10 +4,10 @@ import { Loader2 } from 'lucide-react';
 
 const buttonVariants = {
   primary: 'bg-kenya-green-500 text-white shadow-sm hover:bg-kenya-green-600 focus:ring-kenya-green-500 dark:bg-kenya-green-600 dark:hover:bg-kenya-green-700',
-  secondary: 'border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:ring-kenya-green-500 dark:border-gray-600 dark:bg-surface-dark dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:border-gray-500',
-  destructive: 'bg-kenya-red text-white shadow-sm hover:bg-red-700 focus:ring-kenya-red-500',
-  ghost: 'text-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:ring-kenya-green-500 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100',
-  outline: 'border border-kenya-green-200 text-kenya-green-700 hover:bg-kenya-green-50 focus:ring-kenya-green-500 dark:border-kenya-green-700 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900/20',
+  secondary: 'border border-kenya-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 focus:ring-kenya-green-500 dark:border-gray-600 dark:bg-surface-dark dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:border-gray-500',
+  destructive: 'bg-red-600 text-white shadow-sm hover:bg-red-700 focus:ring-red-500',
+  ghost: 'text-kenya-gray-700 hover:bg-gray-100 hover:text-gray-900 focus:ring-kenya-green-500 dark:text-gray-300 dark:hover:bg-gray-800 dark:hover:text-gray-100',
+  outline: 'border border-kenya-green-300 text-kenya-green-700 hover:bg-kenya-green-50 focus:ring-kenya-green-500 dark:border-kenya-green-700 dark:text-kenya-green-300 dark:hover:bg-kenya-green-900/20',
 };
 
 const buttonSizes = {

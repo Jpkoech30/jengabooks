@@ -12,10 +12,10 @@ interface ToastProps {
 }
 
 const variantStyles: Record<ToastVariant, string> = {
-  success: 'border-l-4 border-kenya-green-500 bg-kenya-green-50 dark:bg-kenya-green-900/30',
-  error: 'border-l-4 border-kenya-red bg-red-50 dark:bg-red-900/30',
-  warning: 'border-l-4 border-kenya-amber-500 bg-kenya-amber-50 dark:bg-kenya-amber-900/30',
-  info: 'border-l-4 border-blue-500 bg-blue-50 dark:bg-blue-900/30',
+  success: 'border-l-4 border-kenya-green-500 bg-emerald-50 dark:bg-kenya-green-900/30',
+  error: 'border-l-4 border-red-500 bg-red-50 dark:bg-red-900/30',
+  warning: 'border-l-4 border-amber-500 bg-amber-50 dark:bg-kenya-amber-900/30',
+  info: 'border-l-4 border-gray-500 bg-gray-50 dark:bg-gray-900/30',
 };
 
 const iconMap: Record<ToastVariant, string> = {
@@ -62,7 +62,7 @@ export function Toast({ variant = 'info', title, message, duration = 5000, onClo
         {iconMap[variant]}
       </span>
       <div className="flex-1 min-w-0">
-        <p className="font-medium text-sm text-kenya-green-900 dark:text-kenya-green-50">
+        <p className="font-medium text-sm text-kenya-gray-900 dark:text-kenya-gray-50">
           {title}
         </p>
         {message && (

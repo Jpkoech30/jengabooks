@@ -27,7 +27,7 @@ export function Input({ label, error, helperText, className, id, ...props }: Inp
           'min-h-[48px] text-base',
           {
             'border-gray-300 focus:border-kenya-green-500 focus:ring-kenya-green-500 dark:border-gray-700 dark:focus:ring-kenya-green-400': !error,
-            'border-kenya-red-500 focus:border-kenya-red-500 focus:ring-kenya-red-500 dark:border-red-400': error,
+            'border-red-500 focus:border-red-500 focus:ring-red-500 dark:border-red-400': error,
           },
           className,
         )}
@@ -36,7 +36,7 @@ export function Input({ label, error, helperText, className, id, ...props }: Inp
         {...props}
       />
       {error && (
-        <p id={`${inputId}-error`} className="mt-1.5 text-sm text-kenya-red-500 dark:text-kenya-red-400" role="alert">
+        <p id={`${inputId}-error`} className="mt-1.5 text-sm text-red-600 dark:text-red-400" role="alert">
           {error}
         </p>
       )}

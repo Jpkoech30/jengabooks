@@ -110,7 +110,7 @@ export function EmptyState({
       {helpLink && (
         <a
           href={helpLink.href}
-          className="mt-4 inline-block text-sm text-kenya-green-600 underline-offset-2 hover:underline dark:text-kenya-green-400"
+          className="mt-4 inline-block text-sm text-kenya-gray-600 underline-offset-2 hover:underline dark:text-kenya-gray-400"
           target="_blank"
           rel="noopener noreferrer"
         >

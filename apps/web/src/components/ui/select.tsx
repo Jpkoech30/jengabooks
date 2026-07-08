@@ -45,7 +45,7 @@ export function Select({
             'min-h-[48px] text-base pr-10',
             {
               'border-gray-300 focus:border-kenya-green-500 focus:ring-kenya-green-500 dark:border-gray-700 dark:focus:ring-kenya-green-400': !error,
-              'border-kenya-red-500 focus:border-kenya-red-500 focus:ring-kenya-red-500': error,
+              'border-red-500 focus:border-red-500 focus:ring-red-500': error,
             },
             className,
           )}
@@ -62,7 +62,7 @@ export function Select({
         </div>
       </div>
       {error && (
-        <p className="mt-1.5 text-sm text-kenya-red-500 dark:text-kenya-red-400" role="alert">{error}</p>
+        <p className="mt-1.5 text-sm text-red-600 dark:text-red-400" role="alert">{error}</p>
       )}
     </div>
   );

@@ -71,7 +71,7 @@ export function SearchableSelect({
             'focus:outline-none focus:ring-2 focus:ring-kenya-green-500 transition-all duration-200',
             'dark:bg-surface-dark dark:text-gray-100 min-h-[48px]',
             'disabled:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-60',
-            error ? 'border-kenya-red-500' : 'border-gray-300 dark:border-gray-700',
+            error ? 'border-red-500' : 'border-gray-300 dark:border-gray-700',
           )}
         >
           <Search className="h-4 w-4 text-gray-400 shrink-0" />
@@ -119,7 +119,7 @@ export function SearchableSelect({
           </div>
         )}
       </div>
-      {error && <p className="mt-1.5 text-sm text-kenya-red-500" role="alert">{error}</p>}
+      {error && <p className="mt-1.5 text-sm text-red-600" role="alert">{error}</p>}
     </div>
   );
 }
