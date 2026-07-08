@@ -1,4 +1,5 @@
 import { Module, OnModuleInit, Logger, Inject } from '@nestjs/common';
+import { Queue } from 'bullmq';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { ScheduleModule } from '@nestjs/schedule';
