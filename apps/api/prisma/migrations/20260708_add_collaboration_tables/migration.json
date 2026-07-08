@@ -1,0 +1,70 @@
+{
+  "version": "5.22",
+  "checksum": "auto-generated",
+  "steps": [
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"comments\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"entityType\" TEXT NOT NULL,\n    \"entityId\" TEXT NOT NULL,\n    \"authorId\" TEXT NOT NULL,\n    \"authorName\" TEXT NOT NULL,\n    \"content\" TEXT NOT NULL,\n    \"mentions\" JSONB,\n    \"attachments\" JSONB,\n    \"status\" TEXT NOT NULL DEFAULT 'ACTIVE',\n    \"parentId\" TEXT,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"comments_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"client_tasks\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"clientId\" TEXT NOT NULL,\n    \"title\" TEXT NOT NULL,\n    \"description\" TEXT,\n    \"category\" TEXT NOT NULL,\n    \"priority\" TEXT NOT NULL DEFAULT 'MEDIUM',\n    \"status\" TEXT NOT NULL DEFAULT 'PENDING',\n    \"assignedToId\" TEXT,\n    \"assignedToName\" TEXT,\n    \"dueDate\" TIMESTAMP(3),\n    \"completedAt\" TIMESTAMP(3),\n    \"completedById\" TEXT,\n    \"escalationCount\" INTEGER NOT NULL DEFAULT 0,\n    \"source\" TEXT,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"client_tasks_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"notifications\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"userId\" TEXT NOT NULL,\n    \"type\" TEXT NOT NULL,\n    \"title\" TEXT NOT NULL,\n    \"message\" TEXT,\n    \"link\" TEXT,\n    \"relatedEntityType\" TEXT,\n    \"relatedEntityId\" TEXT,\n    \"channel\" TEXT NOT NULL DEFAULT 'IN_APP',\n    \"status\" TEXT NOT NULL DEFAULT 'UNREAD',\n    \"sentAt\" TIMESTAMP(3),\n    \"readAt\" TIMESTAMP(3),\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    CONSTRAINT \"notifications_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"comments_company_id_idx\" ON \"comments\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"comments_entity_type_entity_id_idx\" ON \"comments\"(\"entityType\", \"entityId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"comments_parent_id_idx\" ON \"comments\"(\"parentId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"client_tasks_company_id_idx\" ON \"client_tasks\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"client_tasks_client_id_idx\" ON \"client_tasks\"(\"clientId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"client_tasks_assigned_to_id_idx\" ON \"client_tasks\"(\"assignedToId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"client_tasks_status_idx\" ON \"client_tasks\"(\"status\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"notifications_company_id_idx\" ON \"notifications\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"notifications_user_id_status_idx\" ON \"notifications\"(\"userId\", \"status\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"notifications_created_at_idx\" ON \"notifications\"(\"createdAt\")"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"comments\" ADD CONSTRAINT \"comments_companyId_fkey\" FOREIGN KEY (\"companyId\") REFERENCES \"companies\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"client_tasks\" ADD CONSTRAINT \"client_tasks_companyId_fkey\" FOREIGN KEY (\"companyId\") REFERENCES \"companies\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"notifications\" ADD CONSTRAINT \"notifications_companyId_fkey\" FOREIGN KEY (\"companyId\") REFERENCES \"companies\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    }
+  ]
+}

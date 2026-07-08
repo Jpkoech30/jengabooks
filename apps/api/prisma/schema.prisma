@@ -37,6 +37,9 @@ model Company {
   parsingTemplates  ParsingTemplate[]
   employees         Employee[]
   payrollRuns       PayrollRun[]
+  comments          Comment[]
+  clientTasks       ClientTask[]
+  notifications     Notification[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("companies")
@@ -517,3 +520,81 @@ model PayrollEntry {
   @@map("payroll_entries")
 }
 
+/// Transaction-level chat/comment thread.
+/// entityType and entityId reference external records (MPESA_TX, JOURNAL_ENTRY, INVOICE, PAYROLL_ENTRY)
+/// without FK constraints — comments persist as audit trail even after the entity is deleted.
+model Comment {
+  id              String   @id @default(uuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  entityType      String   // MPESA_TX, JOURNAL_ENTRY, INVOICE, PAYROLL_ENTRY
+  entityId        String   // ID of the transaction/entry being commented on
+  authorId        String
+  authorName      String
+  content         String
+  mentions        Json?    // Array of mentioned user IDs: ["user_1", "user_2"]
+  attachments     Json?    // Array of { name: string, url: string, type: string }
+  status          String   @default("ACTIVE") // ACTIVE, RESOLVED, ESCALATED
+  parentId        String?  // For threaded replies (null = top-level)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([entityType, entityId])
+  @@index([parentId])
+  @@map("comments")
+}
+
+/// Auto-generated tasks assigned to clients or team members.
+/// Kept even if the referenced client/user is deleted — orphaned tasks are marked SKIPPED.
+model ClientTask {
+  id              String    @id @default(uuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  clientId        String    // The company/target client (no FK — kept for audit if client deleted)
+  title           String
+  description     String?
+  category        String    // UPLOAD_DOCUMENT, APPROVE_TRANSACTIONS, SIGN_OFF, PROVIDE_INFO
+  priority        String    @default("MEDIUM") // LOW, MEDIUM, HIGH, URGENT
+  status          String    @default("PENDING") // PENDING, COMPLETED, SKIPPED, ESCALATED
+  assignedToId    String?   // User ID of who needs to do this
+  assignedToName  String?
+  dueDate         DateTime?
+  completedAt     DateTime?
+  completedById   String?
+  escalationCount Int      @default(0)
+  source          String?  // AUTO_GENERATED, MANUAL, SYSTEM
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId])
+  @@index([clientId])
+  @@index([assignedToId])
+  @@index([status])
+  @@map("client_tasks")
+}
+
+/// Multi-channel notifications for in-app, email, and SMS delivery.
+/// Persists even if the recipient user is deleted — sender displayed as "System".
+model Notification {
+  id                String   @id @default(uuid())
+  companyId         String
+  company           Company  @relation(fields: [companyId], references: [id])
+  userId            String   // Recipient
+  type              String   // TASK_ASSIGNED, COMMENT_MENTION, DEADLINE_REMINDER, SYSTEM
+  title             String
+  message           String?
+  link              String?  // Deep link to the relevant page
+  relatedEntityType String?
+  relatedEntityId   String?
+  channel           String   @default("IN_APP") // IN_APP, EMAIL, SMS, ALL
+  status            String   @default("UNREAD") // UNREAD, READ, DISMISSED
+  sentAt            DateTime?
+  readAt            DateTime?
+  createdAt         DateTime @default(now())
+
+  @@index([companyId])
+  @@index([userId, status])
+  @@index([createdAt])
+  @@map("notifications")
+}
