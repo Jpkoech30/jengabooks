@@ -1,0 +1,62 @@
+{
+  "version": "5.22",
+  "checksum": "auto-generated",
+  "steps": [
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"employees\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"name\" TEXT NOT NULL,\n    \"email\" TEXT,\n    \"phone\" TEXT,\n    \"kraPin\" TEXT NOT NULL,\n    \"nationalId\" TEXT,\n    \"nhifNumber\" TEXT,\n    \"nssfNumber\" TEXT,\n    \"employeeType\" TEXT NOT NULL,\n    \"taxTreatment\" TEXT NOT NULL,\n    \"status\" TEXT NOT NULL DEFAULT 'ACTIVE',\n    \"terminationDate\" TIMESTAMP(3),\n    \"hireDate\" TIMESTAMP(3) NOT NULL,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"employees_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"salary_structures\" (\n    \"id\" TEXT NOT NULL,\n    \"employeeId\" TEXT NOT NULL,\n    \"effectiveFrom\" TIMESTAMP(3) NOT NULL,\n    \"effectiveTo\" TIMESTAMP(3),\n    \"basicPay\" DOUBLE PRECISION NOT NULL,\n    \"housingLevy\" DOUBLE PRECISION,\n    \"benefits\" JSONB,\n    \"deductions\" JSONB,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"salary_structures_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"payroll_runs\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"periodStart\" TIMESTAMP(3) NOT NULL,\n    \"periodEnd\" TIMESTAMP(3) NOT NULL,\n    \"status\" TEXT NOT NULL DEFAULT 'DRAFT',\n    \"totalGrossPay\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"totalNetPay\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"totalPaye\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"totalNhif\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"totalNssf\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"totalHousingLevy\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"totalEmployerCost\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"generatedAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"lockedAt\" TIMESTAMP(3),\n    \"filedAt\" TIMESTAMP(3),\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"payroll_runs_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"payroll_entries\" (\n    \"id\" TEXT NOT NULL,\n    \"payrollRunId\" TEXT NOT NULL,\n    \"employeeId\" TEXT NOT NULL,\n    \"grossPay\" DOUBLE PRECISION NOT NULL,\n    \"basicPay\" DOUBLE PRECISION NOT NULL,\n    \"benefitsTotal\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"deductionsTotal\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"paye\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"nhif\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"nssf\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"housingLevy\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"netPay\" DOUBLE PRECISION NOT NULL,\n    \"employerNhif\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"employerNssf\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"employerHousing\" DOUBLE PRECISION NOT NULL DEFAULT 0,\n    \"status\" TEXT NOT NULL DEFAULT 'CALCULATED',\n    \"paymentDate\" TIMESTAMP(3),\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"payroll_entries_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"employees_company_id_idx\" ON \"employees\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"salary_structures_employee_id_idx\" ON \"salary_structures\"(\"employeeId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"payroll_runs_company_id_idx\" ON \"payroll_runs\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"payroll_entries_payroll_run_id_idx\" ON \"payroll_entries\"(\"payrollRunId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"payroll_entries_employee_id_idx\" ON \"payroll_entries\"(\"employeeId\")"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"employees\" ADD CONSTRAINT \"employees_companyId_fkey\" FOREIGN KEY (\"companyId\") REFERENCES \"companies\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"salary_structures\" ADD CONSTRAINT \"salary_structures_employeeId_fkey\" FOREIGN KEY (\"employeeId\") REFERENCES \"employees\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"payroll_runs\" ADD CONSTRAINT \"payroll_runs_companyId_fkey\" FOREIGN KEY (\"companyId\") REFERENCES \"companies\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"payroll_entries\" ADD CONSTRAINT \"payroll_entries_payrollRunId_fkey\" FOREIGN KEY (\"payrollRunId\") REFERENCES \"payroll_runs\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"payroll_entries\" ADD CONSTRAINT \"payroll_entries_employeeId_fkey\" FOREIGN KEY (\"employeeId\") REFERENCES \"employees\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    }
+  ]
+}

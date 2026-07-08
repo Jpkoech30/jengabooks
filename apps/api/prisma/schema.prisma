@@ -32,9 +32,11 @@ model Company {
   aiFeedbackLogs  AiFeedbackLog[]
   userLevels      UserLevel[]
   wizardProgress  WizardProgress[]
-  auditLogs       AuditLog[]
+  auditLogs         AuditLog[]
   statementUploads  StatementUpload[]
   parsingTemplates  ParsingTemplate[]
+  employees         Employee[]
+  payrollRuns       PayrollRun[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("companies")
@@ -416,5 +418,102 @@ model ParsingTemplate {
 
   @@index([tenantId, institution])
   @@map("parsing_templates")
+}
+
+model Employee {
+  id               String    @id @default(uuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id])
+  name             String
+  email            String?
+  phone            String?
+  kraPin           String
+  nationalId       String?
+  nhifNumber       String?
+  nssfNumber       String?
+  employeeType     String
+  taxTreatment     String
+  status           String    @default("ACTIVE")
+  terminationDate  DateTime?
+  hireDate         DateTime
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  salaryStructures SalaryStructure[]
+  payrollEntries   PayrollEntry[]
+
+  @@index([companyId])
+  @@map("employees")
+}
+
+model SalaryStructure {
+  id            String   @id @default(uuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  effectiveFrom DateTime
+  effectiveTo   DateTime?
+  basicPay      Float
+  housingLevy   Float?
+  benefits      Json?
+  deductions    Json?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([employeeId])
+  @@map("salary_structures")
+}
+
+model PayrollRun {
+  id               String    @id @default(uuid())
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id])
+  periodStart      DateTime
+  periodEnd        DateTime
+  status           String    @default("DRAFT")
+  totalGrossPay    Float     @default(0)
+  totalNetPay      Float     @default(0)
+  totalPaye        Float     @default(0)
+  totalNhif        Float     @default(0)
+  totalNssf        Float     @default(0)
+  totalHousingLevy Float     @default(0)
+  totalEmployerCost Float    @default(0)
+  generatedAt      DateTime  @default(now())
+  lockedAt         DateTime?
+  filedAt          DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  entries PayrollEntry[]
+
+  @@index([companyId])
+  @@map("payroll_runs")
+}
+
+model PayrollEntry {
+  id              String    @id @default(uuid())
+  payrollRunId    String
+  payrollRun      PayrollRun @relation(fields: [payrollRunId], references: [id])
+  employeeId      String
+  employee        Employee   @relation(fields: [employeeId], references: [id])
+  grossPay        Float
+  basicPay        Float
+  benefitsTotal   Float      @default(0)
+  deductionsTotal Float      @default(0)
+  paye            Float      @default(0)
+  nhif            Float      @default(0)
+  nssf            Float      @default(0)
+  housingLevy     Float      @default(0)
+  netPay          Float
+  employerNhif    Float      @default(0)
+  employerNssf    Float      @default(0)
+  employerHousing Float      @default(0)
+  status          String     @default("CALCULATED")
+  paymentDate     DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  @@index([payrollRunId])
+  @@index([employeeId])
+  @@map("payroll_entries")
 }
 

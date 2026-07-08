@@ -16,14 +16,6 @@
     },
     {
       "tag": "CreateIndex",
-      "sql": "CREATE INDEX IF NOT EXISTS \"mpesa_transactions_updated_at_idx\" ON \"mpesa_transactions\" (\"updatedAt\")"
-    },
-    {
-      "tag": "CreateIndex",
-      "sql": "CREATE INDEX IF NOT EXISTS \"bank_transactions_updated_at_idx\" ON \"bank_transactions\" (\"updatedAt\")"
-    },
-    {
-      "tag": "CreateIndex",
       "sql": "CREATE INDEX IF NOT EXISTS \"pending_reviews_updated_at_idx\" ON \"pending_reviews\" (\"updatedAt\")"
     },
     {

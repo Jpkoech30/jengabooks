@@ -153,3 +153,11 @@
 - **FEATURE-CREEP**: Only the 2 explicitly listed files were modified
 - **48px touch targets**: All interactive elements use `touch-target` class (preserved)
 - **Contrast**: White (#FFFFFF) on kenya-green-500 (#0A5C36) = **5.3:1** ✅ WCAG AA for normal text (requires 4.5:1)
+  
+## Sprint 5.2 - VAT Auto-Calculation from Ledger (2026-07-08)  
+- Added taxRate column (Float?) to ChartOfAccount model in Prisma schema  
+- Created migration: add tax_rate column to chart_of_accounts table  
+- Created new tax/ module: TaxModule, TaxController (GET /tax/vat), TaxService  
+- VAT rates: 16%% standard (default), 8%% reduced, 0%% zero-rated, null = exempt  
+- No new Date() used; dates from query params, timestamps from DB  
+- 13 unit tests all passing - validation, rate mapping, exempt, mixed, partial periods 
