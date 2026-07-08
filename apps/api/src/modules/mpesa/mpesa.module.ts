@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
 import { MulterModule } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { MpesaService } from './mpesa.service';
@@ -13,6 +14,7 @@ import { AiModule } from '../ai/ai.module';
 @Module({
   imports: [
     MulterModule.register({ storage: memoryStorage() }),
+    HttpModule,
     HitlModule,
     AiModule,
   ],

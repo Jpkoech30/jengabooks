@@ -1,6 +1,8 @@
 import { Worker, Job, Queue } from 'bullmq';
 import { Injectable, OnModuleInit, OnModuleDestroy, Inject, Logger } from '@nestjs/common';
 import { DARAJA_QUEUE } from './queue.module';
+import { DarajaService } from '../modules/mpesa/daraja.service';
+import * as crypto from 'crypto';
 
 // ─── Retry delay schedule ────────────────────────────────────────────────
 // Retry 1: 30s, Retry 2: 2min, Retry 3: 10min, Retry 4: 1hr, Retry 5: 6hr
@@ -41,6 +43,7 @@ export class DarajaRetryWorker implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     @Inject(DARAJA_QUEUE) private readonly darajaQueue: Queue,
+    private readonly darajaService: DarajaService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -79,7 +82,7 @@ export class DarajaRetryWorker implements OnModuleInit, OnModuleDestroy {
   }
 
   /**
-   * Retries a transaction status query.
+   * Retries a transaction status query via DarajaService.
    * On failure, re-queues with exponential backoff up to max retries.
    */
   private async handleQueryStatus(data: DarajaJobData): Promise<void> {
@@ -95,10 +98,18 @@ export class DarajaRetryWorker implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Daraja status query for ${receiptNo} — max retries reached`);
       return;
     }
+
+    try {
+      const result = await this.darajaService.queryTransactionStatus(receiptNo);
+      this.logger.log(`Daraja status query succeeded for ${receiptNo}: ${result.ResponseDescription}`);
+    } catch (err: any) {
+      this.logger.warn(`Daraja status query failed for ${receiptNo}: ${err.message}`);
+      await this.scheduleRetry('query-transaction-status', { receiptNo, companyId }, attempt + 1);
+    }
   }
 
   /**
-   * Retries a batch sync operation.
+   * Retries a batch sync operation — loops through receiptNos and queries each.
    */
   private async handleSyncBatch(data: DarajaJobData): Promise<void> {
     const { receiptNos, companyId, attempt = 0 } = data;
@@ -113,6 +124,23 @@ export class DarajaRetryWorker implements OnModuleInit, OnModuleDestroy {
       this.logger.warn(`Daraja batch sync — max retries reached for ${receiptNos.length} receipts`);
       return;
     }
+
+    const failed: string[] = [];
+
+    for (const receiptNo of receiptNos) {
+      try {
+        const result = await this.darajaService.queryTransactionStatus(receiptNo);
+        this.logger.log(`Daraja batch sync succeeded for ${receiptNo}: ${result.ResponseDescription}`);
+      } catch (err: any) {
+        this.logger.warn(`Daraja batch sync failed for ${receiptNo}: ${err.message}`);
+        failed.push(receiptNo);
+      }
+    }
+
+    // Re-queue any failed receipts
+    if (failed.length > 0) {
+      await this.scheduleRetry('sync-batch', { receiptNos: failed, companyId }, attempt + 1);
+    }
   }
 
   // ─── Scheduling Helpers ─────────────────────────────────────────────────
@@ -126,7 +154,7 @@ export class DarajaRetryWorker implements OnModuleInit, OnModuleDestroy {
     attempt: number = 0,
   ): Promise<void> {
     const delay = darajaRetryDelay(attempt);
-    const jobId = `daraja-${type}-${data.receiptNo || Date.now()}-${attempt}`;
+    const jobId = `daraja-${type}-${data.receiptNo || crypto.randomUUID()}-${attempt}`;
 
     this.logger.log(`Scheduling Daraja retry ${type} attempt ${attempt + 1} in ${delay}ms`);
 

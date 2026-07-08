@@ -1,4 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Inject } from '@nestjs/common';
+import { HttpService } from '@nestjs/axios';
+import { lastValueFrom } from 'rxjs';
 import * as crypto from 'crypto';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -79,7 +81,6 @@ const DARAJA_API_BASE_URLS: Record<string, string> = {
   production: 'https://api.safaricom.co.ke',
 };
 
-const TOKEN_CACHE_KEY = 'daraja:access_token';
 const TOKEN_CACHE_TTL_SEC = 3300; // 55 minutes (tokens expire in 1 hour)
 const REQUEST_TIMEOUT_MS = 15_000;
 
@@ -97,10 +98,12 @@ export class DarajaService {
   private readonly environment: string;
   private readonly callbackBaseUrl: string;
 
-  // In-memory token cache as fallback when Redis is unavailable
+  // In-memory token cache (singleton per process — sufficient for single-instance)
   private memoryToken: { token: string; expiresAt: number } | null = null;
 
-  constructor() {
+  constructor(
+    private readonly httpService: HttpService,
+  ) {
     this.environment = process.env.MPESA_ENVIRONMENT || 'sandbox';
     this.apiBaseUrl = DARAJA_API_BASE_URLS[this.environment] || DARAJA_API_BASE_URLS.sandbox;
     this.consumerKey = process.env.MPESA_CONSUMER_KEY || '';
@@ -121,32 +124,10 @@ export class DarajaService {
   // ─── OAuth2: Token Management ──────────────────────────────────────────
 
   /**
-   * Gets a valid access token, using cached version if available.
-   * Tries Redis first, falls back to in-memory cache.
+   * Gets a valid access token, using in-memory cached version if available.
    */
   async getAccessToken(): Promise<string> {
-    // Try Redis cache first
-    try {
-      const { default: Redis } = await import('ioredis');
-      const redis = new Redis({
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        maxRetriesPerRequest: 1,
-        lazyConnect: true,
-      });
-
-      const cached = await redis.get(TOKEN_CACHE_KEY);
-      if (cached) {
-        this.logger.debug('Using cached Daraja access token from Redis');
-        await redis.quit().catch(() => {});
-        return cached;
-      }
-      await redis.quit().catch(() => {});
-    } catch (err: any) {
-      this.logger.debug(`Redis unavailable for Daraja token cache: ${err.message}`);
-    }
-
-    // Try in-memory cache fallback
+    // Try in-memory cache
     if (this.memoryToken && this.memoryToken.expiresAt > Date.now() + 60_000) {
       this.logger.debug('Using cached Daraja access token from memory');
       return this.memoryToken.token;
@@ -157,7 +138,7 @@ export class DarajaService {
   }
 
   /**
-   * Fetches a new access token from Daraja OAuth2 endpoint and caches it.
+   * Fetches a new access token from Daraja OAuth2 endpoint and caches it in-memory.
    */
   private async fetchNewToken(): Promise<string> {
     const auth = Buffer.from(`${this.consumerKey}:${this.consumerSecret}`).toString('base64');
@@ -166,44 +147,28 @@ export class DarajaService {
 
     this.logger.log('Fetching new Daraja access token');
 
-    const axios = require('axios');
-    const response = await axios.post(
-      url,
-      {},
-      {
-        headers: {
-          Authorization: `Basic ${auth}`,
-          'Content-Type': 'application/json',
+    const response = await lastValueFrom(
+      this.httpService.post<DarajaOAuthResponse>(
+        url,
+        {},
+        {
+          headers: {
+            Authorization: `Basic ${auth}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: REQUEST_TIMEOUT_MS,
         },
-        timeout: REQUEST_TIMEOUT_MS,
-      },
+      ),
     );
 
-    const data = response.data as DarajaOAuthResponse;
+    const data = response.data;
     const { access_token, expires_in } = data;
 
     if (!access_token) {
       throw new Error('Daraja OAuth2 response missing access_token');
     }
 
-    // Cache token in Redis
-    try {
-      const { default: Redis } = await import('ioredis');
-      const redis = new Redis({
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        maxRetriesPerRequest: 1,
-        lazyConnect: true,
-      });
-
-      await redis.setex(TOKEN_CACHE_KEY, TOKEN_CACHE_TTL_SEC, access_token);
-      await redis.quit().catch(() => {});
-      this.logger.log('Daraja access token cached in Redis');
-    } catch (err: any) {
-      this.logger.debug(`Could not cache Daraja token in Redis: ${err.message}`);
-    }
-
-    // Fallback in-memory cache
+    // Cache in-memory
     this.memoryToken = {
       token: access_token,
       expiresAt: Date.now() + (expires_in || 3600) * 1000,
@@ -213,27 +178,12 @@ export class DarajaService {
   }
 
   /**
-   * Refreshes the token (invalidates cache, fetches new one).
+   * Refreshes the token (invalidates in-memory cache, fetches new one).
    * Called when a 401 is received.
    */
   async refreshToken(): Promise<string> {
     this.logger.log('Refreshing expired Daraja access token');
     this.memoryToken = null;
-
-    // Invalidate Redis cache
-    try {
-      const { default: Redis } = await import('ioredis');
-      const redis = new Redis({
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379', 10),
-        maxRetriesPerRequest: 1,
-        lazyConnect: true,
-      });
-
-      await redis.del(TOKEN_CACHE_KEY);
-      await redis.quit().catch(() => {});
-    } catch { /* non-blocking */ }
-
     return this.fetchNewToken();
   }
 
@@ -303,7 +253,7 @@ export class DarajaService {
   // ─── HTTP Client with Retry ────────────────────────────────────────────
 
   /**
-   * Makes an authenticated POST request to Daraja API.
+   * Makes an authenticated POST request to Daraja API via HttpService.
    * On 401, refreshes the token and retries once.
    */
   private async postWithRetry<T>(
@@ -313,18 +263,19 @@ export class DarajaService {
     retried = false,
   ): Promise<T> {
     const url = `${this.apiBaseUrl}${path}`;
-    const axios = require('axios');
 
     try {
-      const response = await axios.post(url, body, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        timeout: REQUEST_TIMEOUT_MS,
-      });
+      const response = await lastValueFrom(
+        this.httpService.post<T>(url, body, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          timeout: REQUEST_TIMEOUT_MS,
+        }),
+      );
 
-      return response.data as T;
+      return response.data;
     } catch (err: any) {
       // Handle 401 (token expired) — refresh and retry once
       if (err.response?.status === 401 && !retried) {

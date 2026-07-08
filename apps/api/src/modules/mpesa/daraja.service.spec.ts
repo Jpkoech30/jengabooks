@@ -1,8 +1,11 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { HttpService } from '@nestjs/axios';
+import { of, throwError } from 'rxjs';
 import { DarajaService, C2BWebhookPayload } from './daraja.service';
 
 describe('DarajaService', () => {
   let service: DarajaService;
+  let httpService: HttpService;
 
   beforeAll(() => {
     // Set env vars for testing
@@ -15,10 +18,19 @@ describe('DarajaService', () => {
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [DarajaService],
+      providers: [
+        DarajaService,
+        {
+          provide: HttpService,
+          useValue: {
+            post: jest.fn().mockReturnValue(of({ data: {} })),
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<DarajaService>(DarajaService);
+    httpService = module.get<HttpService>(HttpService);
   });
 
   afterEach(() => {
@@ -33,7 +45,15 @@ describe('DarajaService', () => {
     it('should not be configured when credentials are missing', async () => {
       delete process.env.MPESA_CONSUMER_KEY;
       const module: TestingModule = await Test.createTestingModule({
-        providers: [DarajaService],
+        providers: [
+          DarajaService,
+          {
+            provide: HttpService,
+            useValue: {
+              post: jest.fn().mockReturnValue(of({ data: {} })),
+            },
+          },
+        ],
       }).compile();
       const unconfigured = module.get<DarajaService>(DarajaService);
       expect(unconfigured.isConfigured).toBe(false);
@@ -168,7 +188,15 @@ describe('DarajaService', () => {
     it('should throw when API is not configured', async () => {
       delete process.env.MPESA_CONSUMER_KEY;
       const module: TestingModule = await Test.createTestingModule({
-        providers: [DarajaService],
+        providers: [
+          DarajaService,
+          {
+            provide: HttpService,
+            useValue: {
+              post: jest.fn().mockReturnValue(of({ data: {} })),
+            },
+          },
+        ],
       }).compile();
       const svc = module.get<DarajaService>(DarajaService);
 
@@ -176,6 +204,50 @@ describe('DarajaService', () => {
         .rejects.toThrow('Daraja API is not configured');
 
       process.env.MPESA_CONSUMER_KEY = 'test-consumer-key';
+    });
+  });
+
+  describe('getAccessToken', () => {
+    it('should fetch a new token when cache is empty and cache it in memory', async () => {
+      const mockAxiosResponse = {
+        data: {
+          access_token: 'fresh-test-token',
+          expires_in: 3600,
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any,
+      };
+      jest.spyOn(httpService, 'post').mockReturnValueOnce(of(mockAxiosResponse));
+
+      const token = await service.getAccessToken();
+
+      expect(token).toBe('fresh-test-token');
+      expect(httpService.post).toHaveBeenCalledTimes(1);
+    });
+
+    it('should return cached token if still valid', async () => {
+      // First call populates cache
+      const mockAxiosResponse = {
+        data: {
+          access_token: 'cached-token',
+          expires_in: 3600,
+        },
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        config: {} as any,
+      };
+      jest.spyOn(httpService, 'post').mockReturnValueOnce(of(mockAxiosResponse));
+
+      await service.getAccessToken(); // prime the cache
+
+      // Second call should use cache
+      const token = await service.getAccessToken();
+
+      expect(token).toBe('cached-token');
+      expect(httpService.post).toHaveBeenCalledTimes(1); // Still 1 — not called again
     });
   });
 });
