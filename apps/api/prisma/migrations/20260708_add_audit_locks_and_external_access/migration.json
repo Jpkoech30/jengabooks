@@ -1,0 +1,86 @@
+{
+  "version": "5.22",
+  "checksum": "auto-generated",
+  "steps": [
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"audit_locks\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"fiscalYear\" INTEGER NOT NULL,\n    \"periodStart\" TIMESTAMP(3) NOT NULL,\n    \"periodEnd\" TIMESTAMP(3) NOT NULL,\n    \"lockType\" TEXT NOT NULL,\n    \"status\" TEXT NOT NULL DEFAULT 'OPEN',\n    \"lockedById\" TEXT NOT NULL,\n    \"lockedAt\" TIMESTAMP(3),\n    \"unlockReason\" TEXT,\n    \"unlockRequestedById\" TEXT,\n    \"modules\" JSONB,\n    \"roleOverrides\" JSONB,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\n    CONSTRAINT \"audit_locks_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"external_access\" (\n    \"id\" TEXT NOT NULL,\n    \"companyId\" TEXT NOT NULL,\n    \"grantorId\" TEXT NOT NULL,\n    \"recipientName\" TEXT NOT NULL,\n    \"recipientEmail\" TEXT,\n    \"accessLevel\" TEXT NOT NULL,\n    \"accessToken\" TEXT NOT NULL,\n    \"expiresAt\" TIMESTAMP(3) NOT NULL,\n    \"lastAccessedAt\" TIMESTAMP(3),\n    \"purpose\" TEXT NOT NULL,\n    \"isRevoked\" BOOLEAN NOT NULL DEFAULT false,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    CONSTRAINT \"external_access_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"external_access_logs\" (\n    \"id\" TEXT NOT NULL,\n    \"accessId\" TEXT NOT NULL,\n    \"action\" TEXT NOT NULL,\n    \"resourceType\" TEXT NOT NULL,\n    \"resourceId\" TEXT,\n    \"ipAddress\" TEXT,\n    \"userAgent\" TEXT,\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\n    CONSTRAINT \"external_access_logs_pkey\" PRIMARY KEY (\"id\")\n)"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE UNIQUE INDEX \"audit_locks_company_id_fiscal_year_period_start_key\" ON \"audit_locks\"(\"companyId\", \"fiscalYear\", \"periodStart\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"audit_locks_company_id_idx\" ON \"audit_locks\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"audit_locks_fiscal_year_idx\" ON \"audit_locks\"(\"fiscalYear\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"audit_locks_company_id_status_idx\" ON \"audit_locks\"(\"companyId\", \"status\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"audit_locks_company_id_fiscal_year_period_start_period_end_idx\" ON \"audit_locks\"(\"companyId\", \"fiscalYear\", \"periodStart\", \"periodEnd\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"external_access_company_id_idx\" ON \"external_access\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE UNIQUE INDEX \"external_access_access_token_key\" ON \"external_access\"(\"accessToken\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"external_access_expires_at_idx\" ON \"external_access\"(\"expiresAt\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"external_access_company_id_is_revoked_idx\" ON \"external_access\"(\"companyId\", \"isRevoked\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"external_access_logs_access_id_idx\" ON \"external_access_logs\"(\"accessId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"external_access_logs_access_id_created_at_idx\" ON \"external_access_logs\"(\"accessId\", \"createdAt\")"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"audit_locks\" ADD CONSTRAINT \"audit_locks_companyId_fkey\" FOREIGN KEY (\"companyId\") REFERENCES \"companies\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"audit_locks\" ADD CONSTRAINT \"audit_locks_lockedById_fkey\" FOREIGN KEY (\"lockedById\") REFERENCES \"users\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"audit_locks\" ADD CONSTRAINT \"audit_locks_unlockRequestedById_fkey\" FOREIGN KEY (\"unlockRequestedById\") REFERENCES \"users\"(\"id\") ON DELETE SET NULL ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"external_access\" ADD CONSTRAINT \"external_access_companyId_fkey\" FOREIGN KEY (\"companyId\") REFERENCES \"companies\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"external_access\" ADD CONSTRAINT \"external_access_grantorId_fkey\" FOREIGN KEY (\"grantorId\") REFERENCES \"users\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    },
+    {
+      "tag": "CreateForeignKey",
+      "sql": "ALTER TABLE \"external_access_logs\" ADD CONSTRAINT \"external_access_logs_accessId_fkey\" FOREIGN KEY (\"accessId\") REFERENCES \"external_access\"(\"id\") ON DELETE RESTRICT ON UPDATE CASCADE"
+    }
+  ]
+}

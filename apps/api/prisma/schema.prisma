@@ -32,9 +32,11 @@ model Company {
   aiFeedbackLogs  AiFeedbackLog[]
   userLevels      UserLevel[]
   wizardProgress  WizardProgress[]
-  auditLogs         AuditLog[]
-  statementUploads  StatementUpload[]
-  parsingTemplates  ParsingTemplate[]
+  auditLogs           AuditLog[]
+  statementUploads    StatementUpload[]
+  parsingTemplates    ParsingTemplate[]
+  auditLocks          AuditLock[]
+  externalAccessGrants ExternalAccess[]
   employees         Employee[]
   payrollRuns       PayrollRun[]
   comments          Comment[]
@@ -65,15 +67,18 @@ model User {
   isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  memberships    CompanyMember[]
-  postedEntries  JournalEntry[]
-  xpRecords      XPRecord[]
-  userLevels     UserLevel[]
-  assignedReviews PendingReview[] @relation("AssignedReviews")
-  resolvedReviews PendingReview[] @relation("ResolvedReviews")
-  statementUploads StatementUpload[]
-  auditLogs         AuditLog[]
-  refreshTokens     RefreshToken[]
+  memberships          CompanyMember[]
+  postedEntries        JournalEntry[]
+  xpRecords            XPRecord[]
+  userLevels           UserLevel[]
+  assignedReviews      PendingReview[] @relation("AssignedReviews")
+  resolvedReviews      PendingReview[] @relation("ResolvedReviews")
+  statementUploads     StatementUpload[]
+  auditLogs            AuditLog[]
+  refreshTokens        RefreshToken[]
+  auditLocksLocked     AuditLock[] @relation("AuditLockLocker")
+  unlockRequestedLocks AuditLock[] @relation("AuditLockUnlocker")
+  externalAccessGrants ExternalAccess[]
   @@map("users")
 }
 
@@ -638,5 +643,81 @@ model DocumentVersion {
 
   @@index([documentId])
   @@map("document_versions")
+}
+
+/// Fiscal period lock-down for audit compliance.
+/// Prevents modifications to financial data within locked periods.
+/// Supports FULL, MODULE_SPECIFIC, and ROLE_BASED lock types.
+model AuditLock {
+  id                  String    @id @default(uuid())
+  companyId           String
+  company             Company   @relation(fields: [companyId], references: [id])
+  fiscalYear          Int       // e.g., 2026
+  periodStart         DateTime  // e.g., 2026-01-01
+  periodEnd           DateTime  // e.g., 2026-03-31
+  lockType            String    // FULL, MODULE_SPECIFIC, ROLE_BASED
+  status              String    @default("OPEN") // OPEN, LOCKED, AMENDED
+  lockedById          String
+  lockedBy            User      @relation("AuditLockLocker", fields: [lockedById], references: [id])
+  lockedAt            DateTime?
+  unlockReason        String?   // Required for any amendment to locked period
+  unlockRequestedById String?
+  unlockRequestedBy   User?     @relation("AuditLockUnlocker", fields: [unlockRequestedById], references: [id])
+  modules             Json?     // ["LEDGER", "MPESA", "ETIMS", "PAYROLL"] — which modules are locked
+  roleOverrides       Json?     // {"ACCOUNTANT": "edit", "SME_OWNER": "view"}
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@unique([companyId, fiscalYear, periodStart])
+  @@index([companyId])
+  @@index([fiscalYear])
+  @@index([companyId, status])
+  @@index([companyId, fiscalYear, periodStart, periodEnd])
+  @@map("audit_locks")
+}
+
+/// Temporary access grants for external auditors, bank officers, and KRA auditors.
+/// Each grant has an access token, expiry date, and access level.
+model ExternalAccess {
+  id              String    @id @default(uuid())
+  companyId       String
+  company         Company   @relation(fields: [companyId], references: [id])
+  grantorId       String
+  grantor         User      @relation(fields: [grantorId], references: [id])
+  recipientName   String    // e.g., "KRA Auditor", "KCB Bank"
+  recipientEmail  String?
+  accessLevel     String    // READ_ONLY, VIEW_ONLY, RUN_REPORTS
+  accessToken     String    @unique // Unique token for authentication
+  expiresAt       DateTime
+  lastAccessedAt  DateTime?
+  purpose         String    // ANNUAL_AUDIT, LOAN_APPLICATION, KRA_AUDIT, OTHER
+  isRevoked       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  accessLogs ExternalAccessLog[]
+
+  @@index([companyId])
+  @@index([accessToken])
+  @@index([expiresAt])
+  @@index([companyId, isRevoked])
+  @@map("external_access")
+}
+
+/// Audit trail for all actions performed by external access grants.
+/// Retained indefinitely for KRA audit compliance.
+model ExternalAccessLog {
+  id            String   @id @default(uuid())
+  accessId      String
+  access        ExternalAccess @relation(fields: [accessId], references: [id])
+  action        String   // VIEW_REPORT, DOWNLOAD_DOCUMENT, LIST_TRANSACTIONS
+  resourceType  String   // REPORT, DOCUMENT, TRANSACTION
+  resourceId    String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime @default(now())
+
+  @@index([accessId])
+  @@index([accessId, createdAt])
+  @@map("external_access_logs")
 }
 
