@@ -6,6 +6,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { DashboardSkeleton } from '../components/ui/skeleton';
 import { XPBar } from '../components/ui/xp-bar';
+import { HealthDot } from '../components/dashboard/health-dot';
 import { IncomeForm } from '../components/forms/income-form';
 import { ExpenseForm } from '../components/forms/expense-form';
 import { api } from '../lib/api-client';
@@ -187,26 +188,7 @@ function FirmDashboard({
                         <span className="text-xs text-gray-500 dark:text-gray-400">{client.role.replace(/_/g, ' ')}</span>
                       </td>
                       <td className="py-3 px-4 text-center">
-                        {client.healthScore !== null ? (
-                          <div className="inline-flex items-center gap-1.5" title={healthLabel(client.healthScore)}>
-                            <div className="relative w-8 h-8">
-                              <svg className="w-8 h-8 transform -rotate-90" viewBox="0 0 36 36">
-                                <circle cx="18" cy="18" r="14" fill="none" stroke="#E5E7EB" strokeWidth="3" />
-                                <circle cx="18" cy="18" r="14" fill="none"
-                                  stroke={client.healthScore >= 70 ? '#0A5C36' : client.healthScore >= 40 ? '#E8A317' : '#BB1E10'}
-                                  strokeWidth="3"
-                                  strokeDasharray={`${2 * Math.PI * 14}`}
-                                  strokeDashoffset={`${2 * Math.PI * 14 * (1 - client.healthScore / 100)}`}
-                                  strokeLinecap="round" />
-                              </svg>
-                              <div className="absolute inset-0 flex items-center justify-center">
-                                <span className="text-[8px] font-bold">{Math.round(client.healthScore)}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">—</span>
-                        )}
+                        <HealthDot score={client.healthScore} size="md" />
                       </td>
                       <td className="py-3 px-4 text-center hidden md:table-cell">
                         <span className="text-xs text-gray-600 dark:text-gray-400">{client.totalEntries.toLocaleString()}</span>
@@ -458,23 +440,11 @@ function ClientDashboard({
               <Card>
                 <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="relative w-14 h-14 shrink-0">
-                      <svg className="w-14 h-14 transform -rotate-90" viewBox="0 0 100 100">
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="#E5E7EB" strokeWidth="8" />
-                        <circle cx="50" cy="50" r="40" fill="none"
-                          stroke={healthScore.overallScore >= 70 ? '#0A5C36' : healthScore.overallScore >= 40 ? '#E8A317' : '#BB1E10'}
-                          strokeWidth="8" strokeDasharray={`${2 * Math.PI * 40}`}
-                          strokeDashoffset={`${2 * Math.PI * 40 * (1 - healthScore.overallScore / 100)}`}
-                          strokeLinecap="round" />
-                      </svg>
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-xs font-bold">{Math.round(healthScore.overallScore)}</span>
-                      </div>
-                    </div>
+                    <HealthDot score={healthScore.overallScore} size="lg" showLabel />
                     <div>
                       <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">Health Score</h3>
                       <p className={`text-xs font-medium ${healthScore.overallScore >= 70 ? 'text-green-600' : healthScore.overallScore >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
-                        {healthScore.overallScore >= 70 ? '✅ Healthy' : healthScore.overallScore >= 40 ? '⚠️ Needs Attention' : '🔴 Critical'}
+                        {healthScore.overallScore >= 70 ? 'Healthy' : healthScore.overallScore >= 40 ? 'Needs Attention' : 'Critical'}
                       </p>
                     </div>
                   </div>
