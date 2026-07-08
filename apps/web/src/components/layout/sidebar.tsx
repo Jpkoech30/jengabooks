@@ -1,6 +1,7 @@
 import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { clsx } from 'clsx';
+import { useViewModeStore } from '../../stores/view-mode-store';
 
 interface NavItem {
   to: string;
@@ -62,12 +63,21 @@ interface SidebarProps {
 
 export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const viewMode = useViewModeStore((state) => state.mode);
+  const setMode = useViewModeStore((state) => state.setMode);
+  const activeClient = useViewModeStore((state) => state.activeClient);
 
   const handleNavClick = () => {
     // Close sidebar on mobile after navigation
     if (window.innerWidth < 1024) {
       onClose();
     }
+  };
+
+  const handleBackToFirm = () => {
+    setMode('firm');
+    navigate('/');
   };
 
   const sidebarContent = (
@@ -79,9 +89,26 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         </div>
         <div>
           <h1 className="text-lg font-bold leading-tight">JengaBooks</h1>
-          <p className="text-xs text-kenya-green-200">Accounting SaaS</p>
+          <p className="text-xs text-kenya-green-200">
+            {viewMode === 'client' && activeClient
+              ? activeClient.name
+              : 'Accounting SaaS'}
+          </p>
         </div>
       </div>
+
+      {/* Dual-mode navigation */}
+      {viewMode === 'client' && activeClient && (
+        <div className="px-3 pt-3">
+          <button
+            onClick={handleBackToFirm}
+            className="touch-target flex w-full items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium text-kenya-green-100 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <span aria-hidden="true">←</span>
+            <span>Back to Firm Overview</span>
+          </button>
+        </div>
+      )}
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto py-4 px-3">
