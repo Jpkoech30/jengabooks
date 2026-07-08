@@ -1,4 +1,5 @@
 import React from 'react';
+import { useQueryClient, useMutation } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
@@ -31,12 +32,60 @@ const TYPE_COLORS: Record<string, string> = {
 const ACCOUNT_TYPES = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'] as const;
 
 export function Accounts() {
+  const queryClient = useQueryClient();
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [showCreateForm, setShowCreateForm] = React.useState(false);
   const [editingAccount, setEditingAccount] = React.useState<Account | null>(null);
   const [formData, setFormData] = React.useState({ code: '', name: '', type: 'EXPENSE', parentId: '' });
   const [saving, setSaving] = React.useState(false);
+
+  const invalidateAccounts = () => {
+    queryClient.invalidateQueries({ queryKey: ['accounts'] });
+    loadAccounts();
+  };
+
+  const createMutation = useMutation({
+    mutationFn: (data: { code: string; name: string; type: string; parentId?: string }) =>
+      api.post('/ledger/accounts', data),
+    onSuccess: () => {
+      setShowCreateForm(false);
+      setFormData({ code: '', name: '', type: 'EXPENSE', parentId: '' });
+      showToast('success', 'Account created', `Account ${formData.code} has been created`);
+      invalidateAccounts();
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to create account', err?.response?.data?.message || 'Please try again');
+    },
+    onSettled: () => setSaving(false),
+  });
+
+  const updateMutation = useMutation({
+    mutationFn: (data: { id: string; name: string; parentId?: string }) =>
+      api.patch(`/ledger/accounts/${data.id}`, { name: data.name, parentId: data.parentId }),
+    onSuccess: () => {
+      setEditingAccount(null);
+      setFormData({ code: '', name: '', type: 'EXPENSE', parentId: '' });
+      showToast('success', 'Account updated', `Account ${formData.name} has been updated`);
+      invalidateAccounts();
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to update account', err?.response?.data?.message || 'Please try again');
+    },
+    onSettled: () => setSaving(false),
+  });
+
+  const toggleActiveMutation = useMutation({
+    mutationFn: (data: { id: string; isActive: boolean; name: string }) =>
+      api.patch(`/ledger/accounts/${data.id}`, { isActive: data.isActive }),
+    onSuccess: (_data, variables) => {
+      showToast(variables.isActive ? 'success' : 'warning', `${variables.isActive ? 'Reactivated' : 'Deactivated'}`, `${variables.name} has been ${variables.isActive ? 'reactivated' : 'deactivated'}`);
+      invalidateAccounts();
+    },
+    onError: (err: any) => {
+      showToast('error', 'Failed to update account', err?.response?.data?.message || 'Please try again');
+    },
+  });
 
   async function loadAccounts() {
     setLoading(true);
@@ -62,65 +111,34 @@ export function Accounts() {
     });
   };
 
-  const handleCreate = async (e: React.FormEvent) => {
+  const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
-    try {
-      await api.post('/ledger/accounts', {
-        code: formData.code,
-        name: formData.name,
-        type: formData.type,
-        parentId: formData.parentId || undefined,
-      });
-      setShowCreateForm(false);
-      setFormData({ code: '', name: '', type: 'EXPENSE', parentId: '' });
-      showToast('success', 'Account created', `Account ${formData.code} has been created`);
-      loadAccounts();
-    } catch (err: any) {
-      showToast('error', 'Failed to create account', err?.response?.data?.message || 'Please try again');
-    } finally {
-      setSaving(false);
-    }
+    createMutation.mutate({
+      code: formData.code,
+      name: formData.name,
+      type: formData.type,
+      parentId: formData.parentId || undefined,
+    });
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAccount) return;
     setSaving(true);
-    try {
-      await api.patch(`/ledger/accounts/${editingAccount.id}`, {
-        name: formData.name,
-        parentId: formData.parentId || undefined,
-      });
-      setEditingAccount(null);
-      setFormData({ code: '', name: '', type: 'EXPENSE', parentId: '' });
-      showToast('success', 'Account updated', `Account ${formData.name} has been updated`);
-      loadAccounts();
-    } catch (err: any) {
-      showToast('error', 'Failed to update account', err?.response?.data?.message || 'Please try again');
-    } finally {
-      setSaving(false);
-    }
+    updateMutation.mutate({
+      id: editingAccount.id,
+      name: formData.name,
+      parentId: formData.parentId || undefined,
+    });
   };
 
-  const handleDeactivate = async (id: string, name: string) => {
-    try {
-      await api.patch(`/ledger/accounts/${id}`, { isActive: false });
-      showToast('warning', 'Account deactivated', `${name} has been deactivated`);
-      loadAccounts();
-    } catch (err: any) {
-      showToast('error', 'Failed to deactivate account', err?.response?.data?.message || 'Please try again');
-    }
+  const handleDeactivate = (id: string, name: string) => {
+    toggleActiveMutation.mutate({ id, isActive: false, name });
   };
 
-  const handleReactivate = async (id: string, name: string) => {
-    try {
-      await api.patch(`/ledger/accounts/${id}`, { isActive: true });
-      showToast('success', 'Account reactivated', `${name} is now active`);
-      loadAccounts();
-    } catch (err: any) {
-      showToast('error', 'Failed to reactivate account', err?.response?.data?.message || 'Please try again');
-    }
+  const handleReactivate = (id: string, name: string) => {
+    toggleActiveMutation.mutate({ id, isActive: true, name });
   };
 
   const rootAccounts = accounts.filter((a) => !a.parentId);
