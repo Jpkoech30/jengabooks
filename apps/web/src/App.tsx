@@ -108,11 +108,18 @@ function App() {
     <QueryClientProvider client={queryClient}>
     <ErrorBoundary>
     <div className="flex h-screen">
+      {/* Skip-to-content link for keyboard users */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-4 focus:left-4 focus:z-[100] focus:px-4 focus:py-2 focus:bg-kenya-green-500 focus:text-white focus:rounded-lg focus:text-sm focus:font-medium"
+      >
+        Skip to main content
+      </a>
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       <div className="flex-1 flex flex-col min-w-0">
         <Header onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <SyncStatusBanner />
-        <main className="flex-1 overflow-y-auto p-6 scroll-smooth">
+        <main id="main-content" className="flex-1 overflow-y-auto p-6 scroll-smooth" tabIndex={-1}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
             <Route path="/login" element={<Navigate to="/" replace />} />
