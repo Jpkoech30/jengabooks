@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { PageShell } from '../components/layout/page-shell';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
 
@@ -408,11 +409,10 @@ export function Reports() {
 
   // ─── OVERVIEW: All Sections ─────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Reports</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Select a category to view and generate reports</p>
-      </div>
+    <PageShell
+      title="Reports"
+      subtitle="Select a category to view and generate reports"
+    >
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         {categories.map((cat) => {
@@ -454,7 +454,7 @@ export function Reports() {
           );
         })}
       </div>
-    </div>
+    </PageShell>
   );
 }
 
