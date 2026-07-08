@@ -20,6 +20,7 @@ import { WizardModule } from './modules/wizard/wizard.module';
 import { DashboardModule } from './modules/dashboard/dashboard.module';
 import { TaxModule } from './modules/tax/tax.module';
 import { PayrollModule } from './modules/payroll/payroll.module';
+import { PracticeModule } from './modules/practice/practice.module';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { PayrollModule } from './modules/payroll/payroll.module';
     TaxModule,
     PayrollModule,
     StatementsModule,
+    PracticeModule,
   ],
   providers: [
     {
