@@ -251,7 +251,27 @@ export function HitlHub() {
             </div>
             <div className="flex flex-col gap-3 min-h-[200px]">
               {getColumnTasks(column.status).map((task) => (
-                <Card key={task.id}>
+                <Card
+                  key={task.id}
+                  draggable={column.status !== 'RESOLVED'}
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData('text/plain', task.id);
+                    e.dataTransfer.effectAllowed = 'move';
+                  }}
+                  onDragOver={(e) => {
+                    if (column.status !== 'RESOLVED') {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                    }
+                  }}
+                  onDrop={async (e) => {
+                    e.preventDefault();
+                    const draggedId = e.dataTransfer.getData('text/plain');
+                    if (draggedId && column.status === 'IN_PROGRESS') {
+                      await claimTask(draggedId);
+                    }
+                  }}
+                >
                   <CardContent className="p-4">
                     <div className="flex items-start justify-between mb-2">
                       <Badge variant={priorityBadge(task.category)} size="sm">{task.category.replace(/_/g, ' ')}</Badge>
