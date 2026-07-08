@@ -3,20 +3,24 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Toggle } from '../components/ui/toggle';
+import { XPBar } from '../components/ui/xp-bar';
 import { PageShell } from '../components/layout/page-shell';
 import { useAuthStore } from '../stores/auth-store';
 import { useUiStore, showToast } from '../stores/ui-store';
+import { useGamificationProfile } from '../hooks/use-api';
 import { api } from '../lib/api-client';
 
 export function Settings() {
   const user = useAuthStore((state) => state.user);
   const login = useAuthStore((state) => state.login);
+  const darkMode = useUiStore((state) => state.darkMode);
+  const toggleDarkMode = useUiStore((state) => state.toggleDarkMode);
   const showGamification = useUiStore((state) => state.showGamification);
   const setShowGamification = useUiStore((state) => state.setShowGamification);
+  const { data: gamification } = useGamificationProfile();
   const [companyName, setCompanyName] = React.useState(user?.companyName || '');
   const [saving, setSaving] = React.useState(false);
 
-  // Create company state
   const [showCreateCompany, setShowCreateCompany] = React.useState(false);
   const [newCompanyName, setNewCompanyName] = React.useState('');
   const [newCompanyTier, setNewCompanyTier] = React.useState('BRONZE');
@@ -47,7 +51,6 @@ export function Settings() {
         kraPin: newCompanyKraPin || undefined,
       });
 
-      // Add current user as SME_OWNER
       await api.post(`/companies/${company.id}/members`, {
         userId: user!.id,
         role: 'SME_OWNER',
@@ -68,10 +71,8 @@ export function Settings() {
   return (
     <PageShell
       title="Settings"
-      subtitle="Manage your account and company settings"
+      subtitle="Manage your account, preferences, and company settings"
     >
-
-      {/* Company Profile */}
       <Card>
         <CardHeader>
           <CardTitle>Company Profile</CardTitle>
@@ -98,7 +99,6 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      {/* Account Info */}
       <Card>
         <CardHeader>
           <CardTitle>Account Information</CardTitle>
@@ -116,26 +116,77 @@ export function Settings() {
         </CardContent>
       </Card>
 
-      {/* Preferences */}
       <Card>
         <CardHeader>
           <CardTitle>Preferences</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between max-w-md">
-            <div>
-              <p className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Gamification</p>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Show XP badges, levels, and gamification elements</p>
+          <div className="flex flex-col gap-5 max-w-md">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Dark Mode</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Switch between light and dark theme</p>
+              </div>
+              <Toggle
+                checked={darkMode}
+                onChange={toggleDarkMode}
+              />
             </div>
-            <Toggle
-              checked={showGamification}
-              onChange={setShowGamification}
-            />
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Gamification</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Show XP badges, levels, and gamification elements</p>
+              </div>
+              <Toggle
+                checked={showGamification}
+                onChange={setShowGamification}
+              />
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Create New Company */}
+      {showGamification && gamification && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Gamification & Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4 max-w-md">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">⭐</span>
+                <div>
+                  <p className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
+                    Level {gamification.level} — {gamification.levelTitle}
+                  </p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {gamification.score} XP total
+                  </p>
+                </div>
+              </div>
+              <XPBar
+                current={gamification.score}
+                max={gamification.score + gamification.xpToNextLevel}
+                label="Progress to next level"
+              />
+              {gamification.recentActivity && gamification.recentActivity.length > 0 && (
+                <div className="mt-2">
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Recent Activity</p>
+                  <div className="space-y-1.5">
+                    {gamification.recentActivity.slice(0, 5).map((activity, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <span className="text-xs font-medium text-kenya-amber-600">+{activity.points} XP</span>
+                        <span className="text-xs text-gray-600 dark:text-gray-400">{activity.reason}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Client Onboarding</CardTitle>
