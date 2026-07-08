@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Delete, Body, Param, Query, Req, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import { Controller, Post, Get, Patch, Delete, Body, Param, Query, Req, UseGuards, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { MpesaService } from './mpesa.service';
 import { PdfParserService } from './pdf-parser.service';
@@ -21,7 +21,6 @@ export class MpesaController {
   @UseInterceptors(FileInterceptor('file'))
   async uploadPdf(@Req() req: any, @UploadedFile() file: any) {
     if (!file) throw new BadRequestException('PDF file is required');
-    // Accept both 'application/pdf' and generic 'application/octet-stream' or missing type
     const isPdf = file.mimetype === 'application/pdf' || file.originalname?.endsWith('.pdf');
     if (!isPdf) throw new BadRequestException('Only PDF files are accepted');
 
@@ -43,6 +42,26 @@ export class MpesaController {
     if (page) filters.page = parseInt(page, 10);
     if (limit) filters.limit = parseInt(limit, 10);
     return this.mpesaService.findTransactions(req.user.companyId, filters);
+  }
+
+  @Patch('transactions/:id/categorize')
+  categorizeTransaction(
+    @Param('id') id: string,
+    @Body() body: { accountId: string },
+  ) {
+    return this.mpesaService.mapToAccount(id, body.accountId);
+  }
+
+  @Post('transactions/batch-categorize')
+  batchCategorize(
+    @Body() body: { ids: string[]; accountId: string },
+  ) {
+    return this.mpesaService.batchCategorize(body.ids, body.accountId);
+  }
+
+  @Delete()
+  deleteAllTransactions(@Req() req: any) {
+    return this.mpesaService.deleteAllTransactions(req.user.companyId);
   }
 
   @Post(':transactionId/map')

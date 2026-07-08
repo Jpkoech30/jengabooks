@@ -199,6 +199,32 @@ export class MpesaService {
     };
   }
 
+  async batchCategorize(ids: string[], accountId: string) {
+    if (!ids || ids.length === 0) {
+      throw new BadRequestException('No transaction IDs provided');
+    }
+
+    let successCount = 0;
+    const errors: Array<{ id: string; error: string }> = [];
+
+    for (const id of ids) {
+      try {
+        await this.mapToAccount(id, accountId);
+        successCount++;
+      } catch (err: any) {
+        errors.push({ id, error: err.message });
+        this.logger.warn(`batchCategorize failed for tx ${id}: ${err.message}`);
+      }
+    }
+
+    return {
+      total: ids.length,
+      successCount,
+      errorCount: errors.length,
+      errors: errors.length > 0 ? errors : undefined,
+    };
+  }
+
   async deleteTransactions(companyId: string, receiptNos: string[]) {
     if (receiptNos.length === 0) return { deleted: 0 };
     // Fetch IDs of transactions being deleted (needed for HITL cascade)

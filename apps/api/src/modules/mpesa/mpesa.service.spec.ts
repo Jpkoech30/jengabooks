@@ -201,4 +201,48 @@ describe('MpesaService', () => {
       await expect(service.mapToAccount('tx1', 'wrong-acc')).rejects.toThrow(BadRequestException);
     });
   });
+
+  describe('batchCategorize', () => {
+    it('should map multiple transactions to the same account', async () => {
+      mockPrisma.mpesaTransaction.findUnique
+        .mockResolvedValueOnce({ id: 'tx1', companyId: 'c1' })
+        .mockResolvedValueOnce({ id: 'tx2', companyId: 'c1' });
+      mockPrisma.chartOfAccount.findFirst.mockResolvedValue({ id: 'acc-1', companyId: 'c1' });
+      mockPrisma.mpesaTransaction.update
+        .mockResolvedValueOnce({ id: 'tx1', mappedAccountId: 'acc-1' })
+        .mockResolvedValueOnce({ id: 'tx2', mappedAccountId: 'acc-1' });
+
+      const result = await service.batchCategorize(['tx1', 'tx2'], 'acc-1');
+
+      expect(result.total).toBe(2);
+      expect(result.successCount).toBe(2);
+      expect(result.errorCount).toBe(0);
+    });
+
+    it('should report errors for failing transactions without throwing', async () => {
+      mockPrisma.mpesaTransaction.findUnique
+        .mockResolvedValueOnce({ id: 'tx1', companyId: 'c1' })
+        .mockResolvedValueOnce(null); // tx2 not found
+      mockPrisma.chartOfAccount.findFirst.mockResolvedValue({ id: 'acc-1', companyId: 'c1' });
+      mockPrisma.mpesaTransaction.update.mockResolvedValue({ id: 'tx1', mappedAccountId: 'acc-1' });
+
+      const result = await service.batchCategorize(['tx1', 'tx2'], 'acc-1');
+
+      expect(result.total).toBe(2);
+      expect(result.successCount).toBe(1);
+      expect(result.errorCount).toBe(1);
+      expect(result.errors).toHaveLength(1);
+      expect(result.errors![0].id).toBe('tx2');
+    });
+
+    it('should throw if no IDs provided', async () => {
+      await expect(service.batchCategorize([], 'acc-1'))
+        .rejects.toThrow(BadRequestException);
+    });
+
+    it('should throw if IDs is undefined', async () => {
+      await expect(service.batchCategorize(undefined as any, 'acc-1'))
+        .rejects.toThrow(BadRequestException);
+    });
+  });
 });

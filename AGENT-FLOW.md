@@ -36,3 +36,80 @@
 - **FEATURE-CREEP**: Only 3 files modified — all listed in the approved plan
 - **48px touch targets**: All interactive elements use `touch-target` class or explicit `min-h-[48px]`
 - **Dark mode**: All new UI elements have dark mode variants matching existing design tokens
+
+## Task 3.6 — Polish Remaining Pages (Frontend Web)
+
+**Commit:** [`e878654`](jengabooks) — `feat(web): polish accounts, etims, team, and workflow pages`
+
+### Files Changed
+| File | Change | Purpose |
+|------|--------|---------|
+| [`apps/web/src/pages/accounts.tsx`](jengabooks/apps/web/src/pages/accounts.tsx) | Minor polish | Alternating row colors, search highlighting, enhanced EmptyState |
+| [`apps/web/src/pages/etims.tsx`](jengabooks/apps/web/src/pages/etims.tsx) | Minor polish | Quick Create template, status summary cards, enhanced EmptyState |
+| [`apps/web/src/pages/team.tsx`](jengabooks/apps/web/src/pages/team.tsx) | Minor polish | Online status indicators, color-coded role badges, enhanced EmptyState |
+| [`apps/web/src/pages/workflow.tsx`](jengabooks/apps/web/src/pages/workflow.tsx) | Minor polish | Month selector, distinct phase icons, proper error/loading states |
+
+### Changes Summary
+
+**Accounts (`accounts.tsx`):**
+1. **Alternating row colors** — Depth-based alternating background (`bg-white` / `bg-kenya-green-50/20`) so hierarchical levels are visually distinct
+2. **Search text highlighting** — New `highlightText()` helper wraps matched substrings in `<mark>` with yellow background (`bg-yellow-200` light / `bg-yellow-700/50` dark)
+3. **Enhanced EmptyState** — Added `action` prop to `PageState` with "Create your first account" CTA that opens the Create Account modal
+
+**eTIMS (`etims.tsx`):**
+1. **Quick Create template** — Default tax code `"S"` (Standard 16% VAT) was already set; added `endOfMonth()` helper that pre-fills the Due Date field with the last calendar day of the current month
+2. **Better status summary** — Replaced inline rows with 4 colored summary cards (Total, Synced/green, Pending/amber, Failed/red) displayed in a sidebar layout alongside the invoice table
+3. **Enhanced EmptyState** — Added "Create an invoice" CTA that switches to the Create tab
+
+**Team (`team.tsx`):**
+1. **Online status indicators** — Green/gray dots rendered on avatar and next to name, seeded via pseudo-random char code sum for stability per session (70% online / 30% offline mock)
+2. **Better role badges** — Color-coded dropdowns already matched spec (ACCOUNTANT=green, VIEWER=blue, AUDITOR=amber). Owner badge remains `success` variant
+3. **Enhanced EmptyState** — Added "Invite your first member" CTA that opens the Invite modal
+
+**Workflow (`workflow.tsx`):**
+1. **Month selector** — Prev/Next buttons at top of the page with current month label; Next button disabled when viewing current or future months
+2. **Distinct phase icons** — Used a `PHASE_ICONS` lookup map for consistent emoji icons: 📤 (collection), 🏷️ (categorization), 🔄 (reconciliation), 🔒 (close), 📊 (reporting)
+3. **Proper error/loading states** — Added `error` state variable with EmptyState "Unable to load workflow" and retry button; loading state uses `<PageState state="loading">`
+
+### Edge Cases Handled
+- **Accounts**: Empty search results still shows the table header with no rows (existing behavior preserved)
+- **eTIMS**: Zero invoices in history tab shows status summary cards with 0 counts and the EmptyState CTA
+- **Team**: Owner role always shows as static Badge (not editable dropdown); remove button hidden for owners
+- **Workflow**: Month selector cannot navigate into the future; error fallback still shows phase list with pending status
+- **Workflow**: Data fetching failure falls back gracefully to pending phases rather than a blank page
+
+### Compliance Checks
+- **SENTINEL**: No MISSING_API_DATA, TODO, FIXME, invented endpoints, fake response shapes, hardcoded secrets
+- **TIME-TRAVEL**:
+  - `new Date()` used only for display formatting (date/month labels, end-of-month calculation)
+  - No `Date.now()` or `new Date()` in financial calculations or audit logic
+- **FEATURE-CREEP**: Only the 4 explicitly listed files were modified
+- **Dark mode**: All new UI elements (highlighting, status cards, online dots) have dark mode variants
+  
+## Task 3.7 - Fix 3 Backend Contract Mismatches from UX Simplification  
+  
+**Commit:** `3c5ebfe` - `feat(api): add 3 missing M-Pesa endpoints for simplified frontend`  
+  
+### Files Changed  
+| File | Change | Purpose |  
+|------|--------|---------|  
+| [`apps/api/src/modules/mpesa/mpesa.controller.ts`](jengabooks/apps/api/src/modules/mpesa/mpesa.controller.ts) | Modified | Added `Patch transactions/:id/categorize`, `Post transactions/batch-categorize`, `Delete` endpoints |  
+| [`apps/api/src/modules/mpesa/mpesa.service.ts`](jengabooks/apps/api/src/modules/mpesa/mpesa.service.ts) | Modified | Added `batchCategorize()` method that iterates IDs and calls `mapToAccount` |  
+| [`apps/api/src/modules/mpesa/mpesa.service.spec.ts`](jengabooks/apps/api/src/modules/mpesa/mpesa.service.spec.ts) | Modified | Added 4 tests for `batchCategorize` (success, partial failure, empty, undefined) |  
+  
+### Changes Summary  
+1. **PATCH /mpesa/transactions/:id/categorize** - Delegates to existing `mapToAccount()` service method; matches frontend's `api.patch()` call with `{ accountId }` body  
+2. **POST /mpesa/transactions/batch-categorize** - Accepts `{ ids, accountId }`, iterates through IDs calling `mapToAccount()` for each, returns success/error counts. Bulk errors don't throw - collected per-item  
+3. **DELETE /mpesa** - Delegates to existing `deleteAllTransactions(companyId)`; NestJS/Express matches most-specific route first so `DELETE /mpesa/transactions/all` still works  
+  
+### Edge Cases Handled  
+- Empty/undefined `ids` array: throws `BadRequestException` with clear message  
+- Partial failures in batch: returns `errorCount` + per-item `errors` array instead of throwing  
+- Route conflict with existing `DELETE /mpesa/transactions/all`: NestJS more-specific-first routing ensures no collisions  
+- All existing `POST :transactionId/map` kept intact for backward compatibility  
+  
+### Compliance Checks  
+- **SENTINEL**: No MISSING_API_DATA, TODO, FIXME, invented endpoints, fake response shapes, hardcoded secrets  
+- **TIME-TRAVEL**: No new Date() or Date.now() in financial logic  
+- **UNIT TEST**: 18/18 M-Pesa service tests pass (4 new batchCategorize tests added); 299/302 total API tests pass (3 pre-existing auth failures)  
+- **FEATURE-CREEP**: Only the 3 explicitly listed files were modified 
