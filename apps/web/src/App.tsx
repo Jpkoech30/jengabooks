@@ -27,6 +27,7 @@ const Team = lazy(() => import('./pages/team').then((m) => ({ default: m.Team })
 const Settings = lazy(() => import('./pages/settings').then((m) => ({ default: m.Settings })));
 const Help = lazy(() => import('./pages/help').then((m) => ({ default: m.Help })));
 const Payroll = lazy(() => import('./pages/payroll').then((m) => ({ default: m.Payroll })));
+const Employees = lazy(() => import('./pages/employees').then((m) => ({ default: m.Employees })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -144,6 +145,7 @@ function App() {
               <Route path="/settings" element={<Settings />} />
               <Route path="/help" element={<Help />} />
               <Route path="/payroll" element={<Payroll />} />
+              <Route path="/employees" element={<Employees />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
           </Suspense>
