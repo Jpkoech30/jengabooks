@@ -25,6 +25,7 @@ import { CollaborationModule } from './modules/collaboration/collaboration.modul
 import { DocumentsModule } from './modules/documents/documents.module';
 import { AuditModule } from './modules/audit/audit.module';
 import { CashflowModule } from './modules/cashflow/cashflow.module';
+import { BillingModule } from './modules/billing/billing.module';
 
 @Module({
   imports: [
@@ -64,6 +65,7 @@ import { CashflowModule } from './modules/cashflow/cashflow.module';
     DocumentsModule,
     AuditModule,
     CashflowModule,
+    BillingModule,
   ],
   providers: [
     {
