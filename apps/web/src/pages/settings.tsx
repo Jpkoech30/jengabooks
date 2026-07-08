@@ -2,14 +2,17 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { Toggle } from '../components/ui/toggle';
 import { PageShell } from '../components/layout/page-shell';
 import { useAuthStore } from '../stores/auth-store';
-import { showToast } from '../stores/ui-store';
+import { useUiStore, showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
 
 export function Settings() {
   const user = useAuthStore((state) => state.user);
   const login = useAuthStore((state) => state.login);
+  const showGamification = useUiStore((state) => state.showGamification);
+  const setShowGamification = useUiStore((state) => state.setShowGamification);
   const [companyName, setCompanyName] = React.useState(user?.companyName || '');
   const [saving, setSaving] = React.useState(false);
 
@@ -109,6 +112,25 @@ export function Settings() {
             <p className="text-xs text-gray-400">
               Profile management and password change will be available in a future update.
             </p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Preferences */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Preferences</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between max-w-md">
+            <div>
+              <p className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Gamification</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Show XP badges, levels, and gamification elements</p>
+            </div>
+            <Toggle
+              checked={showGamification}
+              onChange={setShowGamification}
+            />
           </div>
         </CardContent>
       </Card>

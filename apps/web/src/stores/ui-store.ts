@@ -13,9 +13,11 @@ export interface Toast {
 interface UiState {
   toasts: Toast[];
   darkMode: boolean;
+  showGamification: boolean;
   addToast: (toast: Omit<Toast, 'id'>) => void;
   removeToast: (id: string) => void;
   toggleDarkMode: () => void;
+  setShowGamification: (show: boolean) => void;
 }
 
 const getInitialDarkMode = (): boolean => {
@@ -39,6 +41,7 @@ applyDarkMode(getInitialDarkMode());
 export const useUiStore = create<UiState>((set) => ({
   toasts: [],
   darkMode: getInitialDarkMode(),
+  showGamification: true,
 
   addToast: (toast) => {
     const id = Date.now().toString() + Math.random().toString(36).substring(2, 6);
@@ -60,6 +63,11 @@ export const useUiStore = create<UiState>((set) => ({
       applyDarkMode(newDark);
       return { darkMode: newDark };
     });
+  },
+
+  setShowGamification: (show) => {
+    localStorage.setItem('jengabooks_show_gamification', String(show));
+    set({ showGamification: show });
   },
 }));
 
