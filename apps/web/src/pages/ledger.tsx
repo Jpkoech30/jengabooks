@@ -5,6 +5,7 @@ import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
 import { TableSkeleton } from '../components/ui/skeleton';
 import { EmptyState } from '../components/ui/empty-state';
+import { PageShell } from '../components/layout/page-shell';
 import { IncomeForm } from '../components/forms/income-form';
 import { ExpenseForm } from '../components/forms/expense-form';
 import { showToast } from '../stores/ui-store';
@@ -70,7 +71,38 @@ export function Ledger() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <PageShell
+      title="General Ledger"
+      subtitle="View and manage all accounting entries"
+      actions={
+        <div className="flex items-center gap-3">
+          <Button variant="secondary" size="sm">Export CSV</Button>
+          <div className="relative">
+            <Button size="sm" onClick={() => setShowNewEntryMenu(!showNewEntryMenu)}>
+              + New Entry
+            </Button>
+            {showNewEntryMenu && (
+              <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-xl border border-kenya-green-100 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden">
+                <button
+                  onClick={() => { setShowIncomeForm(true); setShowNewEntryMenu(false); }}
+                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-900 hover:bg-kenya-green-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
+                >
+                  <span className="text-lg" aria-hidden="true">💰</span>
+                  <span className="font-medium">Record Income</span>
+                </button>
+                <button
+                  onClick={() => { setShowExpenseForm(true); setShowNewEntryMenu(false); }}
+                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-900 hover:bg-kenya-green-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
+                >
+                  <span className="text-lg" aria-hidden="true">💳</span>
+                  <span className="font-medium">Record Expense</span>
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      }
+    >
       {/* Income Form Modal */}
       <IncomeForm
         isOpen={showIncomeForm}
@@ -84,40 +116,6 @@ export function Ledger() {
         onClose={() => { setShowExpenseForm(false); setShowNewEntryMenu(false); }}
         onSuccess={handleCreateSuccess}
       />
-
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">General Ledger</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">View and manage all accounting entries</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button variant="secondary" size="sm">Export CSV</Button>
-          <div className="relative">
-            <Button size="sm" onClick={() => setShowNewEntryMenu(!showNewEntryMenu)}>
-              + New Entry
-            </Button>
-            {showNewEntryMenu && (
-              <div className="absolute right-0 top-full mt-2 z-50 w-48 rounded-xl border border-kenya-green-100 bg-white shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark overflow-hidden">
-                <button
-                  onClick={() => { setShowIncomeForm(true); setShowNewEntryMenu(false); }}
-                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-900 hover:bg-kenya-green-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
-                >
-                  <span className="text-lg">💰</span>
-                  <span className="font-medium">Record Income</span>
-                </button>
-                <button
-                  onClick={() => { setShowExpenseForm(true); setShowNewEntryMenu(false); }}
-                  className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-green-900 hover:bg-kenya-green-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
-                >
-                  <span className="text-lg">💳</span>
-                  <span className="font-medium">Record Expense</span>
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
 
       {/* Summary Bar */}
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -251,6 +249,6 @@ export function Ledger() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

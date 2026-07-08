@@ -2,6 +2,7 @@ import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
+import { PageShell } from '../components/layout/page-shell';
 import { useAuthStore } from '../stores/auth-store';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
@@ -62,11 +63,10 @@ export function Settings() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Settings</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400">Manage your account and company settings</p>
-      </div>
+    <PageShell
+      title="Settings"
+      subtitle="Manage your account and company settings"
+    >
 
       {/* Company Profile */}
       <Card>
@@ -167,6 +167,6 @@ export function Settings() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

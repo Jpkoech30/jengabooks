@@ -3,6 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { Modal } from '../components/ui/modal';
+import { PageShell } from '../components/layout/page-shell';
 import { useAuthStore } from '../stores/auth-store';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
@@ -89,42 +91,43 @@ export function Team() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Team</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your team members and their roles</p>
-        </div>
+    <PageShell
+      title="Team"
+      subtitle="Manage your team members and their roles"
+      actions={
         <Button size="sm" onClick={() => setShowInvite(true)}>+ Invite Member</Button>
-      </div>
-
-      {/* Invite Modal */}
-      {showInvite && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl border border-kenya-green-100 bg-white p-6 shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-kenya-green-900 dark:text-kenya-green-50">Invite Team Member</h2>
-              <button onClick={() => setShowInvite(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            </div>
-            <form onSubmit={handleInvite} className="flex flex-col gap-4">
-              <Input label="Email Address" type="email" placeholder="colleague@company.co.ke" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
-              <Input label="Full Name (optional)" placeholder="e.g., Mary Wanjiku" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Role</label>
-                <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
-                  <option value="ACCOUNTANT">Accountant</option>
-                  <option value="VIEWER">Viewer (read-only)</option>
-                  <option value="AUDITOR">Auditor</option>
-                </select>
-              </div>
-              <div className="flex gap-3 mt-2">
-                <Button type="button" variant="ghost" size="lg" className="flex-1" onClick={() => setShowInvite(false)}>Cancel</Button>
-                <Button type="submit" size="lg" className="flex-1" disabled={sending}>{sending ? 'Inviting...' : 'Send Invitation'}</Button>
-              </div>
-            </form>
+      }
+    >
+      {/* Invite Modal - using shared Modal component with focus trapping and keyboard escape */}
+      <Modal
+        isOpen={showInvite}
+        onClose={() => setShowInvite(false)}
+        title="Invite Team Member"
+        size="sm"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button type="button" variant="ghost" size="md" className="flex-1" onClick={() => setShowInvite(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" size="md" className="flex-1" disabled={sending} form="invite-form">
+              {sending ? 'Inviting...' : 'Send Invitation'}
+            </Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form id="invite-form" onSubmit={handleInvite} className="flex flex-col gap-4">
+          <Input label="Email Address" type="email" placeholder="colleague@company.co.ke" value={inviteEmail} onChange={(e) => setInviteEmail(e.target.value)} required />
+          <Input label="Full Name (optional)" placeholder="e.g., Mary Wanjiku" value={inviteName} onChange={(e) => setInviteName(e.target.value)} />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Role</label>
+            <select value={inviteRole} onChange={(e) => setInviteRole(e.target.value)} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
+              <option value="ACCOUNTANT">Accountant</option>
+              <option value="VIEWER">Viewer (read-only)</option>
+              <option value="AUDITOR">Auditor</option>
+            </select>
+          </div>
+        </form>
+      </Modal>
 
       {/* Members List */}
       <Card>
@@ -136,7 +139,7 @@ export function Team() {
             <div className="py-12 text-center"><p className="text-gray-500">Loading team...</p></div>
           ) : members.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-3xl mb-2">👥</p>
+              <p className="text-3xl mb-2" aria-hidden="true">👥</p>
               <p className="text-gray-500 dark:text-gray-400">No team members yet. Invite someone to collaborate.</p>
             </div>
           ) : (
@@ -174,7 +177,7 @@ export function Team() {
                             <option key={role} value={role}>{ROLE_OPTIONS[role]}</option>
                           ))}
                         </select>
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none">▾</span>
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs pointer-events-none" aria-hidden="true">▾</span>
                       </div>
                     )}
                     {member.role !== 'SME_OWNER' && (
@@ -189,6 +192,6 @@ export function Team() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }

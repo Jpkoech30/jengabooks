@@ -3,6 +3,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '../components/ui/card'
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Badge } from '../components/ui/badge';
+import { Modal } from '../components/ui/modal';
+import { PageShell } from '../components/layout/page-shell';
 import { showToast } from '../stores/ui-store';
 import { api } from '../lib/api-client';
 
@@ -161,87 +163,85 @@ export function Accounts() {
     </React.Fragment>
   );
 
-  return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Chart of Accounts</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400">Manage your chart of accounts</p>
-        </div>
-        <Button size="sm" onClick={() => setShowCreateForm(true)}>+ New Account</Button>
-      </div>
+  const accountOptions = accounts.filter((a) => a.isActive).map((a) => (
+    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+  ));
 
+  return (
+    <PageShell
+      title="Chart of Accounts"
+      subtitle="Manage your chart of accounts"
+      actions={
+        <Button size="sm" onClick={() => setShowCreateForm(true)}>+ New Account</Button>
+      }
+    >
       {/* Create Account Modal */}
-      {showCreateForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl border border-kenya-green-100 bg-white p-6 shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-kenya-green-900 dark:text-kenya-green-50">Create Account</h2>
-              <button onClick={() => setShowCreateForm(false)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            </div>
-            <form onSubmit={handleCreate} className="flex flex-col gap-4">
-              <Input label="Account Code" placeholder="e.g., 5001" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required />
-              <Input label="Account Name" placeholder="e.g., Advertising" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Type</label>
-                <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
-                  {ACCOUNT_TYPES.map((t) => (
-                    <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Parent Account (optional)</label>
-                <select value={formData.parentId} onChange={(e) => setFormData({ ...formData, parentId: e.target.value })} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
-                  <option value="">None (Top Level)</option>
-                  {accounts.filter((a) => a.isActive).map((a) => (
-                    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 mt-2">
-                <Button type="button" variant="ghost" size="lg" className="flex-1" onClick={() => setShowCreateForm(false)}>Cancel</Button>
-                <Button type="submit" size="lg" className="flex-1" disabled={saving}>{saving ? 'Creating...' : 'Create Account'}</Button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showCreateForm}
+        onClose={() => setShowCreateForm(false)}
+        title="Create Account"
+        size="md"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button type="button" variant="ghost" size="md" className="flex-1" onClick={() => setShowCreateForm(false)}>Cancel</Button>
+            <Button type="submit" size="md" className="flex-1" disabled={saving} form="create-account-form">{saving ? 'Creating...' : 'Create Account'}</Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form id="create-account-form" onSubmit={handleCreate} className="flex flex-col gap-4">
+          <Input label="Account Code" placeholder="e.g., 5001" value={formData.code} onChange={(e) => setFormData({ ...formData, code: e.target.value })} required />
+          <Input label="Account Name" placeholder="e.g., Advertising" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Type</label>
+            <select value={formData.type} onChange={(e) => setFormData({ ...formData, type: e.target.value })} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
+              {ACCOUNT_TYPES.map((t) => (
+                <option key={t} value={t}>{t.charAt(0) + t.slice(1).toLowerCase()}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Parent Account (optional)</label>
+            <select value={formData.parentId} onChange={(e) => setFormData({ ...formData, parentId: e.target.value })} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
+              <option value="">None (Top Level)</option>
+              {accountOptions}
+            </select>
+          </div>
+        </form>
+      </Modal>
 
       {/* Edit Account Modal */}
-      {editingAccount && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="w-full max-w-md rounded-2xl border border-kenya-green-100 bg-white p-6 shadow-lg dark:border-kenya-green-800 dark:bg-kenya-surface-dark">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-kenya-green-900 dark:text-kenya-green-50">Edit Account</h2>
-              <button onClick={() => setEditingAccount(null)} className="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
-            </div>
-            <form onSubmit={handleUpdate} className="flex flex-col gap-4">
-              <Input label="Account Code" value={formData.code} disabled className="bg-gray-50 dark:bg-kenya-green-900/30" />
-              <Input label="Account Name" placeholder="e.g., Advertising" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Type</label>
-                <select value={editingAccount.type} disabled className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-gray-50 px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-green-900/30 text-gray-500">
-                  <option value={editingAccount.type}>{editingAccount.type.charAt(0) + editingAccount.type.slice(1).toLowerCase()}</option>
-                </select>
-              </div>
-              <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Parent Account (optional)</label>
-                <select value={formData.parentId} onChange={(e) => setFormData({ ...formData, parentId: e.target.value })} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
-                  <option value="">None (Top Level)</option>
-                  {accounts.filter((a) => a.isActive && a.id !== editingAccount.id).map((a) => (
-                    <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="flex gap-3 mt-2">
-                <Button type="button" variant="ghost" size="lg" className="flex-1" onClick={() => setEditingAccount(null)}>Cancel</Button>
-                <Button type="submit" size="lg" className="flex-1" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
-              </div>
-            </form>
+      <Modal
+        isOpen={editingAccount !== null}
+        onClose={() => setEditingAccount(null)}
+        title="Edit Account"
+        size="md"
+        footer={
+          <div className="flex gap-3 w-full">
+            <Button type="button" variant="ghost" size="md" className="flex-1" onClick={() => setEditingAccount(null)}>Cancel</Button>
+            <Button type="submit" size="md" className="flex-1" disabled={saving} form="edit-account-form">{saving ? 'Saving...' : 'Save Changes'}</Button>
           </div>
-        </div>
-      )}
+        }
+      >
+        <form id="edit-account-form" onSubmit={handleUpdate} className="flex flex-col gap-4">
+          <Input label="Account Code" value={formData.code} disabled className="bg-gray-50 dark:bg-kenya-green-900/30" />
+          <Input label="Account Name" placeholder="e.g., Advertising" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required />
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Type</label>
+            <select value={editingAccount?.type || ''} disabled className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-gray-50 px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-green-900/30 text-gray-500">
+              <option value={editingAccount?.type || ''}>{editingAccount ? editingAccount.type.charAt(0) + editingAccount.type.slice(1).toLowerCase() : ''}</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-kenya-green-900 dark:text-kenya-green-50">Parent Account (optional)</label>
+            <select value={formData.parentId} onChange={(e) => setFormData({ ...formData, parentId: e.target.value })} className="touch-target h-12 rounded-lg border border-kenya-green-200 bg-white px-4 text-sm dark:border-kenya-green-700 dark:bg-kenya-surface-dark">
+              <option value="">None (Top Level)</option>
+              {accounts.filter((a) => a.isActive && a.id !== editingAccount?.id).map((a) => (
+                <option key={a.id} value={a.id}>{a.code} — {a.name}</option>
+              ))}
+            </select>
+          </div>
+        </form>
+      </Modal>
 
       {/* Accounts Table */}
       <Card>
@@ -253,7 +253,7 @@ export function Accounts() {
             <div className="py-12 text-center"><p className="text-gray-500">Loading accounts...</p></div>
           ) : accounts.length === 0 ? (
             <div className="py-12 text-center">
-              <p className="text-3xl mb-2">📒</p>
+              <p className="text-3xl mb-2" aria-hidden="true">📒</p>
               <p className="text-gray-500 dark:text-gray-400">No accounts yet. Create your first account to get started.</p>
             </div>
           ) : (
@@ -276,6 +276,6 @@ export function Accounts() {
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageShell>
   );
 }
