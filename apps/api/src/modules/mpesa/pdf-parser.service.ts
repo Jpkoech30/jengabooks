@@ -94,8 +94,9 @@ export class PdfParserService {
       // Skip summary table lines (concatenated text+numbers like "Buy Goods84,298.000.00")
       if (this.isSummaryLine(line)) continue;
 
-      // Detect receipt line: "UG61DA7OCU2026-07-06"
-      const receiptMatch = line.match(/^([A-Z0-9]{8,12})(\d{4}-\d{2}-\d{2})$/);
+      // Detect receipt line: "UG61DA7OCU2026-07-06" or "SJQ93T4QVR2026-07-06"
+      // Receipt numbers: 6-15 alphanumeric chars, followed by YYYY-MM-DD date
+      const receiptMatch = line.match(/^([A-Z0-9]{6,15})(\d{4}-\d{2}-\d{2})$/);
       if (!receiptMatch) continue;
 
       const receiptNo = receiptMatch[1];
@@ -110,16 +111,20 @@ export class PdfParserService {
       let description = '';
       let paidIn = 0;
       let withdrawn = 0;
+      let amountFound = false;
 
-      for (let j = i + 2; j < Math.min(i + 12, lines.length); j++) {
+      // Scan up to 20 lines ahead for amount data (handles long descriptions)
+      for (let j = i + 2; j < Math.min(i + 20, lines.length); j++) {
         const nextLine = lines[j];
-        if (/^[A-Z0-9]{8,12}\d{4}-\d{2}-\d{2}$/.test(nextLine)) break;
+        // Stop if we hit another receipt line
+        if (/^[A-Z0-9]{6,15}\d{4}-\d{2}-\d{2}$/.test(nextLine)) break;
         if (/^\d{2}:\d{2}:\d{2}$/.test(nextLine)) break;
         if (/^(Total|Summary)/i.test(nextLine)) break;
         if (isNoise(nextLine)) continue;
         if (this.isSummaryLine(nextLine)) continue;
 
         // Check for amount line: "Completed400.000.00114,891.09Customer"
+        // Also handles "Completed400,000.00114,891.09" without trailing text
         const amountMatch = nextLine.match(
           /(?:Completed|Failed)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)\s*(\d{1,3}(?:,\d{3})*(?:\.\d{2})?)/
         );
@@ -130,9 +135,24 @@ export class PdfParserService {
           if (descPrefix && !isNoise(descPrefix)) {
             description += (description ? ' ' : '') + descPrefix;
           }
-        } else if (!/^[\d,.\s]+$/.test(nextLine) && !isNoise(nextLine)) {
+          amountFound = true;
+          break; // Amount found, stop scanning ahead
+        }
+
+        // Collect description text (skip pure number lines)
+        if (!/^[\d,.\s]+$/.test(nextLine) && !isNoise(nextLine)) {
           description += (description ? ' ' : '') + nextLine;
         }
+      }
+
+      // Fallback: if no "Completed"/"Failed" amount line found, try to extract
+      // amounts from description using alternative patterns
+      if (!amountFound && description) {
+        // Try matching "Paid in: X, Withdrawn: Y" patterns
+        const paidInMatch = description.match(/Paid\s+in[:\s]*(\d[\d,.]*)/i);
+        const withdrawnMatch = description.match(/Withdrawn[:\s]*(\d[\d,.]*)/i);
+        if (paidInMatch) paidIn = parseFloat(paidInMatch[1].replace(/,/g, ''));
+        if (withdrawnMatch) withdrawn = parseFloat(withdrawnMatch[1].replace(/,/g, ''));
       }
 
       if (description && (paidIn > 0 || withdrawn > 0)) {
@@ -144,7 +164,7 @@ export class PdfParserService {
         transactions.push({
           transactionDate: new Date(dateTimeStr),
           description: cleanedDesc,
-          amount: paidIn - withdrawn, // net: positive = received, negative = paid out
+          amount: paidIn - withdrawn,
           paidIn,
           withdrawn,
           phoneNumber: cleanedDesc.match(/2547\d{7}|0\d{9}/)?.[0] || undefined,
