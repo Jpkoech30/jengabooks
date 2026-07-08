@@ -68,18 +68,9 @@
     @apply min-h-[48px] min-w-[48px];
   }
 
-  .xp-bar-gradient {
-    @apply bg-gradient-to-r from-kenya-green-500 to-kenya-amber-500;
-  }
-
   .animate-confetti-burst {
     animation: confetti-burst var(--confetti-duration, 1s) ease-out var(--confetti-delay, 0s) forwards;
   }
-}
-
-@keyframes xpFill {
-  from { width: 0%; }
-  to { width: var(--xp-target); }
 }
 
 /* Confetti burst for celebratory empty states */
