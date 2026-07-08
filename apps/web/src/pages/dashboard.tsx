@@ -1,25 +1,56 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent } from '../components/ui/card';
 import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { DashboardSkeleton } from '../components/ui/skeleton';
+import { EmptyState } from '../components/ui/empty-state';
 import { XPBar } from '../components/ui/xp-bar';
-import { HealthDot } from '../components/dashboard/health-dot';
-import { IncomeForm } from '../components/forms/income-form';
-import { ExpenseForm } from '../components/forms/expense-form';
 import { api } from '../lib/api-client';
 import { useAuthStore } from '../stores/auth-store';
+import { formatKES } from '../lib/utils';
 
 /* ──────────────────────────────────────────────────────────────────────────────
    Types
    ──────────────────────────────────────────────────────────────────────────── */
 
-interface DashboardData {
-  totalEntries: number;
-  recentEntries: Array<{ id: string; description: string; amount: number; direction: string; entryDate: string; account: { code: string; name: string }; aiConfidence?: number | null }>;
-  xpScore?: { score: number; level: number; xpToNextLevel: number };
+interface RecentEntry {
+  id: string;
+  description: string;
+  amount: number;
+  direction: string;
+  entryDate: string;
+  account: { code: string; name: string };
+  aiConfidence?: number | null;
+}
+
+interface DashboardSummary {
+  entries: {
+    total: number;
+    recent: RecentEntry[];
+  };
+  monthlySummary?: {
+    totalIncome: number;
+    totalExpenses: number;
+    netProfit: number;
+  };
+  mpesaUncleaned?: number;
+  gamification?: {
+    score: number;
+    level: number;
+    xpToNextLevel: number;
+  };
+  healthScore?: {
+    overallScore: number;
+    pillars: Array<{ name: string; score: number; maxScore: number }>;
+  };
+  wizard?: {
+    percentage: number;
+    completedSteps: number;
+    totalSteps: number;
+    nextStep: { label: string } | null;
+    isComplete: boolean;
+  };
 }
 
 interface FirmClient {
@@ -41,15 +72,7 @@ interface FirmDashboardData {
   clients: FirmClient[];
 }
 
-interface AnalyticsData {
-  monthly: Array<{ month: string; income: number; expense: number }>;
-  topExpenses: Array<{ code: string; name: string; total: number }>;
-  mpesaSummary: { paidIn30d: number; withdrawn30d: number };
-}
-
 type ViewMode = 'firm' | 'client';
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
 /* ──────────────────────────────────────────────────────────────────────────────
    Helpers
@@ -75,6 +98,26 @@ const TIER_BADGE: Record<string, string> = {
   GOLD: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
   PLATINUM: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
 };
+
+function HealthDot({ score, size = 'md' }: { score: number | null; size?: 'sm' | 'md' | 'lg' }) {
+  const dotSizes = { sm: 'h-2.5 w-2.5', md: 'h-3.5 w-3.5', lg: 'h-5 w-5' };
+  const color =
+    score === null
+      ? 'bg-gray-300 dark:bg-gray-600'
+      : score >= 70
+        ? 'bg-green-500'
+        : score >= 40
+          ? 'bg-amber-500'
+          : 'bg-red-500';
+
+  return (
+    <span
+      className={`inline-block rounded-full ${dotSizes[size]} ${color}`}
+      title={score !== null ? `Health: ${score}/100` : 'No health data'}
+      aria-label={`Health score: ${score ?? 'N/A'}`}
+    />
+  );
+}
 
 /* ──────────────────────────────────────────────────────────────────────────────
    FirmDashboard — multi-client overview for accountants / firm owners
@@ -147,10 +190,12 @@ function FirmDashboard({
         </div>
         <CardContent className="p-0">
           {firmData.clients.length === 0 ? (
-            <div className="py-12 text-center">
-              <p className="text-4xl mb-3">📋</p>
-              <p className="text-gray-500 text-sm">No clients yet. Invite a client to get started.</p>
-            </div>
+            <EmptyState
+              icon="📋"
+              title="No clients yet"
+              description="Invite a client to get started."
+              action={{ label: 'Invite Client', onClick: onInvite }}
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -208,11 +253,7 @@ function FirmDashboard({
                         )}
                       </td>
                       <td className="py-3 px-4 text-right">
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => onViewClient(client)}
-                        >
+                        <Button size="sm" variant="ghost" onClick={() => onViewClient(client)}>
                           View →
                         </Button>
                       </td>
@@ -229,64 +270,62 @@ function FirmDashboard({
 }
 
 /* ──────────────────────────────────────────────────────────────────────────────
-   ClientDashboard — existing per-company view
+   ClientDashboard — single-scroll, single-company view
    ──────────────────────────────────────────────────────────────────────────── */
 
 function ClientDashboard({
-  data,
+  summary,
   healthScore,
   wizardData,
-  badges,
-  analytics,
+  gamification,
   companyName,
   onSwitchToFirm,
   isFirmUser,
 }: {
-  data: DashboardData;
+  summary: DashboardSummary;
   healthScore: { overallScore: number; pillars: Array<{ name: string; score: number; maxScore: number }> } | null;
   wizardData: { percentage: number; completedSteps: number; totalSteps: number; nextStep: { label: string } | null; isComplete: boolean } | null;
-  badges: Array<{ id: string; name: string; icon: string; earned: boolean }>;
-  analytics: AnalyticsData | null;
+  gamification: { score: number; level: number; xpToNextLevel: number } | null;
   companyName?: string;
   onSwitchToFirm?: () => void;
   isFirmUser: boolean;
 }) {
   const navigate = useNavigate();
-  const formatKES = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
-  const hasTransactions = data.totalEntries > 0;
-  const earnedBadges = badges.filter(b => b.earned);
-  const [activeTab, setActiveTab] = React.useState('activity');
+  const hasTransactions = summary.entries.total > 0;
+  const recentEntries = summary.entries.recent?.slice(0, 5) || [];
 
-  // Calculate income/expense totals from analytics
-  const totalIncome = analytics?.monthly.reduce((s, m) => s + (m.income || 0), 0) || 0;
-  const totalExpenses = analytics?.monthly.reduce((s, m) => s + (m.expense || 0), 0) || 0;
-  const netProfit = totalIncome - totalExpenses;
+  // Compute KPI values from monthlySummary or fall back to entries count
+  const totalIncome = summary.monthlySummary?.totalIncome ?? 0;
+  const totalExpenses = summary.monthlySummary?.totalExpenses ?? 0;
+  const netProfit = summary.monthlySummary?.netProfit ?? (totalIncome - totalExpenses);
+  const mpesaUncleaned = summary.mpesaUncleaned ?? 0;
 
-  const tabs = [
-    { id: 'activity', label: 'Activity' },
-    { id: 'mpesa', label: 'M-Pesa' },
-    { id: 'health', label: 'Health' },
-    { id: 'month-end', label: 'Month-End' },
-    { id: 'actions', label: 'Actions' },
-  ];
+  const welcomeMessage = hasTransactions
+    ? `Welcome back! Your business is ${healthScore && healthScore.overallScore >= 70 ? 'healthy' : healthScore && healthScore.overallScore >= 40 ? 'on track' : 'needing attention'}.`
+    : 'Start by importing your transactions.';
 
   return (
-    <>
-      {/* ─── HEADER BAR ─────────────────────────────────────────────────── */}
+    <div className="flex flex-col gap-5">
+      {/* ─── HEADER ──────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Dashboard</h1>
+            <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">📊 Dashboard</h1>
             {companyName && (
               <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-kenya-amber-100 dark:bg-kenya-amber-900/30 text-xs font-medium text-kenya-amber-700 dark:text-kenya-amber-300">
                 {companyName}
               </span>
             )}
+            {/* Health badge */}
+            {healthScore && (
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${healthColor(healthScore.overallScore)} bg-opacity-10`}>
+                {healthLabel(healthScore.overallScore)}
+              </span>
+            )}
           </div>
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {hasTransactions
-              ? `${data.totalEntries} entries recorded`
-              : 'Start by importing your transactions'}
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            {welcomeMessage}
+            {hasTransactions && <> · {summary.entries.total.toLocaleString()} entries recorded</>}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -295,27 +334,29 @@ function ClientDashboard({
               ← Firm Overview
             </Button>
           )}
-          {data?.xpScore && (
-            <XPBar current={data.xpScore.score} max={data.xpScore.score + data.xpScore.xpToNextLevel} showLevel className="w-40 hidden sm:flex" />
-          )}
-          <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>📊 Reports</Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/ledger')}>
+            📒 Ledger
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>
+            📊 Reports
+          </Button>
         </div>
       </div>
 
-      {/* ─── NEW USER WELCOME ──────────────────────────────────────────── */}
+      {/* ─── NEW USER WELCOME ─────────────────────────────────────────── */}
       {!hasTransactions && (
         <Card>
-          <CardContent className="p-6 text-center">
-            <p className="text-4xl mb-3" aria-hidden="true">👋</p>
-            <h2 className="text-lg font-semibold text-kenya-green-900 dark:text-kenya-green-50 mb-2">Welcome to JengaBooks</h2>
-            <p className="text-sm text-gray-500 mb-4 max-w-md mx-auto">
-              Import your M-Pesa statement or record your first transaction to get started
-            </p>
-            <div className="flex justify-center gap-3 flex-wrap">
-              <Button onClick={() => navigate('/mpesa')}>Import M-Pesa</Button>
-            </div>
+          <CardContent className="p-6">
+            <EmptyState
+              icon="👋"
+              title="Welcome to JengaBooks"
+              description="Import your M-Pesa statement or record your first transaction to get started."
+              action={{ label: 'Import M-Pesa', onClick: () => navigate('/mpesa') }}
+              helpLink={{ label: 'Record your first transaction →', href: '/ledger' }}
+            />
+            {/* Getting Started wizard — always visible even for new users */}
             {wizardData && !wizardData.isComplete && (
-              <div className="mt-5 max-w-sm mx-auto">
+              <div className="max-w-sm mx-auto mt-2">
                 <div className="flex items-center justify-between mb-1.5">
                   <span className="text-xs font-medium text-kenya-green-600">Getting Started</span>
                   <span className="text-xs font-bold text-kenya-green-600">{wizardData.percentage}%</span>
@@ -333,253 +374,189 @@ function ClientDashboard({
         </Card>
       )}
 
-      {/* ─── TABS ──────────────────────────────────────────────────────── */}
+      {/* ─── 4 KPI CARDS ───────────────────────────────────────────────── */}
       {hasTransactions && (
-        <>
-          {/* Tab bar */}
-          <div className="flex gap-1 border-b border-kenya-green-100 dark:border-kenya-green-800 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`touch-target px-5 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px whitespace-nowrap ${
-                  activeTab === tab.id
-                    ? 'border-kenya-green-500 text-kenya-green-700 dark:text-kenya-green-300'
-                    : 'border-transparent text-gray-500 hover:text-kenya-green-600'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Tab content */}
-          {activeTab === 'activity' && (
-            <div className="flex flex-col gap-5">
-              {/* Snapshot cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <Card>
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100">
-                      <span className="text-lg" aria-hidden="true">💰</span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg font-bold text-green-700">{formatKES(totalIncome)}</p>
-                      <p className="text-xs text-gray-500">Total Income</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100">
-                      <span className="text-lg" aria-hidden="true">💸</span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-lg font-bold text-red-600">{formatKES(totalExpenses)}</p>
-                      <p className="text-xs text-gray-500">Total Expenses</p>
-                    </div>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="p-4 flex items-center gap-3">
-                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${netProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'}`}>
-                      <span className="text-lg" aria-hidden="true">{netProfit >= 0 ? '📈' : '📉'}</span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className={`text-lg font-bold ${netProfit >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatKES(Math.abs(netProfit))}</p>
-                      <p className="text-xs text-gray-500">{netProfit >= 0 ? 'Net Profit' : 'Net Loss'}</p>
-                    </div>
-                  </CardContent>
-                </Card>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {/* Income */}
+          <Card>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-100">
+                <span className="text-lg" aria-hidden="true">💰</span>
               </div>
+              <div className="min-w-0">
+                <p className="text-lg font-bold text-green-700">{formatKES(totalIncome)}</p>
+                <p className="text-xs text-gray-500">Income</p>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Monthly Trend */}
-              {analytics && analytics.monthly.length > 0 && (
-                <Card>
-                  <CardContent className="p-4">
-                    <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50 mb-4">Monthly Income vs Expenses</h3>
-                    <div className="flex items-end gap-1.5 h-28" style={{ minHeight: '112px' }}>
-                      {analytics.monthly.map((m) => {
-                        const allValues = analytics.monthly.flatMap(x => [x.income || 0, x.expense || 0]);
-                        const maxVal = Math.max(...allValues, 1);
-                        const incomeH = ((m.income || 0) / maxVal) * 80;
-                        const expenseH = ((m.expense || 0) / maxVal) * 80;
-                        const monthNum = parseInt(m.month.slice(5), 10);
-                        const label = MONTHS[monthNum - 1] || m.month.slice(5);
-                        return (
-                          <div key={m.month} className="flex-1 flex flex-col items-center gap-0.5 min-w-0">
-                            <div className="w-full flex flex-col items-center justify-end" style={{ height: '80px' }}>
-                              <div className="w-full bg-green-500 rounded-t" style={{ height: `${Math.max(incomeH, 1)}px` }} title={`Income: KES ${(m.income || 0).toLocaleString()}`} />
-                              <div className="w-full bg-red-400 rounded-b" style={{ height: `${Math.max(expenseH, 1)}px` }} title={`Expenses: KES ${(m.expense || 0).toLocaleString()}`} />
-                            </div>
-                            <span className="text-[10px] text-gray-400 mt-1">{label}</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                    <div className="flex gap-4 mt-2 text-[10px] text-gray-500">
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-green-500" /> Income</span>
-                      <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded bg-red-400" /> Expenses</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+          {/* Expenses */}
+          <Card>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-red-100">
+                <span className="text-lg" aria-hidden="true">💸</span>
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-bold text-red-600">{formatKES(totalExpenses)}</p>
+                <p className="text-xs text-gray-500">Expenses</p>
+              </div>
+            </CardContent>
+          </Card>
 
-              {/* Recent Activity */}
-              <Card>
-                <div className="p-4 border-b border-kenya-green-100 dark:border-kenya-green-800 flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">Recent Activity</h3>
-                  {data.recentEntries.length > 0 && (
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/ledger')}>View All →</Button>
-                  )}
-                </div>
-                <CardContent className="p-0">
-                  {data.recentEntries.length === 0 ? (
-                    <div className="py-8 text-center">
-                      <p className="text-gray-400 text-sm">No recent transactions</p>
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-kenya-green-50 dark:divide-kenya-green-900">
-                      {data.recentEntries.slice(0, 5).map((entry) => (
-                        <div key={entry.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30">
-                          <span className="text-xs text-gray-400 w-16 shrink-0">{new Date(entry.entryDate).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}</span>
-                          <span className="text-sm text-kenya-green-900 dark:text-kenya-green-50 flex-1 truncate min-w-0">{entry.description}</span>
-                          <span className={`text-sm font-mono font-medium shrink-0 ${entry.direction === 'DEBIT' ? 'text-red-600' : 'text-green-600'}`}>
-                            {formatKES(entry.amount)}
-                          </span>
-                          <Badge variant={entry.direction === 'DEBIT' ? 'info' : 'success'} size="sm" className="shrink-0 hidden sm:inline-flex">{entry.account?.code}</Badge>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          {/* Net Profit */}
+          <Card>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${netProfit >= 0 ? 'bg-blue-100' : 'bg-red-100'}`}>
+                <span className="text-lg" aria-hidden="true">{netProfit >= 0 ? '📈' : '📉'}</span>
+              </div>
+              <div className="min-w-0">
+                <p className={`text-lg font-bold ${netProfit >= 0 ? 'text-blue-700' : 'text-red-600'}`}>{formatKES(Math.abs(netProfit))}</p>
+                <p className="text-xs text-gray-500">{netProfit >= 0 ? 'Net Profit' : 'Net Loss'}</p>
+              </div>
+            </CardContent>
+          </Card>
 
-          {activeTab === 'mpesa' && analytics && (analytics.mpesaSummary.paidIn30d > 0 || analytics.mpesaSummary.withdrawn30d > 0) && (
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50 mb-3">M-Pesa (30 days)</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-green-600">Paid In</span>
-                    <span className="font-mono text-green-600">{formatKES(analytics.mpesaSummary.paidIn30d)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-red-600">Withdrawn</span>
-                    <span className="font-mono text-red-600">{formatKES(analytics.mpesaSummary.withdrawn30d)}</span>
-                  </div>
-                  <div className="border-t border-gray-100 dark:border-gray-700 pt-3 flex justify-between text-sm font-semibold">
-                    <span>Net</span>
-                    <span className={`font-mono ${analytics.mpesaSummary.paidIn30d - analytics.mpesaSummary.withdrawn30d >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {formatKES(analytics.mpesaSummary.paidIn30d - analytics.mpesaSummary.withdrawn30d)}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {activeTab === 'health' && (
-            <div className="flex flex-col gap-5">
-              {healthScore && (
-                <Card>
-                  <CardContent className="p-4">
-                    <div className="flex items-center gap-3">
-                      <HealthDot score={healthScore.overallScore} size="lg" showLabel />
-                      <div>
-                        <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">Business Health</h3>
-                        <p className={`text-xs font-medium ${healthScore.overallScore >= 70 ? 'text-green-600' : healthScore.overallScore >= 40 ? 'text-amber-600' : 'text-red-600'}`}>
-                          {healthScore.overallScore >= 70 ? 'Healthy' : healthScore.overallScore >= 40 ? 'Needs Attention' : 'Critical'}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-              {analytics && analytics.topExpenses.length > 0 && (
-                <Card>
-                  <CardContent className="p-4">
-                    <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50 mb-3">Top Expenses</h3>
-                    <div className="space-y-2">
-                      {analytics.topExpenses.map((e, i) => (
-                        <div key={e.code || i} className="flex items-center justify-between">
-                          <span className="text-xs text-gray-700 dark:text-gray-300 truncate max-w-[200px]">{e.name || e.code}</span>
-                          <span className="text-xs font-mono font-medium text-red-600">{formatKES(e.total || 0)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'month-end' && wizardData && (
-            <Card>
-              <CardContent className="p-4">
-                <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50 mb-3">Month-End Progress</h3>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-medium text-kenya-green-600">{wizardData.percentage}%</span>
-                  <span className="text-xs text-gray-500">{wizardData.completedSteps} of {wizardData.totalSteps} steps</span>
-                </div>
-                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                  <div className="h-full bg-kenya-green-500 rounded-full" style={{ width: `${wizardData.percentage}%` }} />
-                </div>
-                {wizardData.nextStep && (
-                  <p className="mt-2 text-xs text-gray-500">
-                    Next: <span className="font-medium text-kenya-green-600">{wizardData.nextStep.label}</span>
-                  </p>
+          {/* M-Pesa uncleaned alert */}
+          <Card>
+            <CardContent className="p-4 flex items-center gap-3">
+              <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${mpesaUncleaned > 0 ? 'bg-amber-100' : 'bg-green-100'}`}>
+                <span className="text-lg" aria-hidden="true">{mpesaUncleaned > 0 ? '📱' : '✅'}</span>
+              </div>
+              <div className="min-w-0">
+                {mpesaUncleaned > 0 ? (
+                  <>
+                    <p className="text-lg font-bold text-amber-600">{mpesaUncleaned}</p>
+                    <p className="text-xs text-gray-500">
+                      <button
+                        onClick={() => navigate('/mpesa')}
+                        className="hover:text-kenya-green-600 underline underline-offset-2"
+                      >
+                        M-Pesa to map
+                      </button>
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="text-lg font-bold text-green-700">All mapped</p>
+                    <p className="text-xs text-gray-500">M-Pesa ✓</p>
+                  </>
                 )}
-              </CardContent>
-            </Card>
-          )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
-          {activeTab === 'actions' && (
-            <div className="flex flex-col gap-5">
-              {data?.xpScore && (
-                <Card>
-                  <CardContent className="p-4">
-                    <XPBar current={data.xpScore.score} max={data.xpScore.score + data.xpScore.xpToNextLevel} label={`Level ${data.xpScore.level}`} />
-                    {earnedBadges.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {earnedBadges.map((badge) => (
-                          <span key={badge.id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-kenya-green-50 dark:bg-kenya-green-900/30 text-[10px] font-medium text-kenya-green-700 dark:text-kenya-green-300">
-                            {badge.icon} {badge.name}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
+      {/* ─── MONTH-END PROGRESS ─────────────────────────────────────────── */}
+      {hasTransactions && wizardData && (
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
+                📋 Month-End Progress
+              </h3>
+              <span className="text-xs font-bold text-kenya-green-600">{wizardData.percentage}%</span>
+            </div>
+            <div className="h-2.5 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-kenya-green-500 rounded-full transition-all duration-500"
+                style={{ width: `${wizardData.percentage}%` }}
+              />
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-xs text-gray-500">
+                {wizardData.isComplete
+                  ? 'All steps complete! 🎉'
+                  : `${wizardData.completedSteps} of ${wizardData.totalSteps} steps`
+                }
+              </p>
+              {wizardData.nextStep && !wizardData.isComplete && (
+                <Button size="sm" variant="ghost" onClick={() => navigate('/workflow')}>
+                  {wizardData.nextStep.label} →
+                </Button>
               )}
-              <Card>
-                <CardContent className="p-4">
-                  <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50 mb-3">Quick Links</h3>
-                  <div className="flex flex-wrap gap-2">
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/mpesa')}>M-Pesa</Button>
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/ledger')}>Ledger</Button>
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/reports')}>Reports</Button>
-                    <Button variant="ghost" size="sm" onClick={() => navigate('/etims')}>eTIMS</Button>
-                  </div>
-                </CardContent>
-              </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* ─── RECENT ACTIVITY ───────────────────────────────────────────── */}
+      <Card>
+        <div className="p-4 border-b border-kenya-green-100 dark:border-kenya-green-800 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">Recent Activity</h3>
+          {hasTransactions && (
+            <Button variant="ghost" size="sm" onClick={() => navigate('/ledger')}>
+              View All →
+            </Button>
+          )}
+        </div>
+        <CardContent className="p-0">
+          {!hasTransactions ? (
+            <EmptyState
+              icon="📋"
+              title="No transactions yet"
+              description="Import an M-Pesa statement or record your first transaction to see activity here."
+              action={{ label: 'Import M-Pesa', onClick: () => navigate('/mpesa') }}
+            />
+          ) : recentEntries.length === 0 ? (
+            <EmptyState
+              icon="📭"
+              title="No recent activity"
+              description="Recent transactions will appear here once recorded."
+            />
+          ) : (
+            <div className="divide-y divide-kenya-green-50 dark:divide-kenya-green-900">
+              {recentEntries.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex items-center gap-3 px-4 py-2.5 hover:bg-kenya-green-50/50 dark:hover:bg-kenya-green-900/30 transition-colors"
+                >
+                  <span className="text-xs text-gray-400 w-16 shrink-0">
+                    {new Date(entry.entryDate).toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })}
+                  </span>
+                  <span className="text-sm text-kenya-green-900 dark:text-kenya-green-50 flex-1 truncate min-w-0">
+                    {entry.description}
+                  </span>
+                  <span
+                    className={`text-sm font-mono font-medium shrink-0 ${
+                      entry.direction === 'DEBIT' ? 'text-red-600' : 'text-green-600'
+                    }`}
+                  >
+                    {formatKES(entry.amount)}
+                  </span>
+                  <Badge
+                    variant={entry.direction === 'DEBIT' ? 'info' : 'success'}
+                    size="sm"
+                    className="shrink-0 hidden sm:inline-flex"
+                  >
+                    {entry.account?.code}
+                  </Badge>
+                </div>
+              ))}
             </div>
           )}
-        </>
+        </CardContent>
+      </Card>
+
+      {/* ─── XP BAR (compact) — always visible if gamification data exists ── */}
+      {gamification && (
+        <XPBar
+          current={gamification.score}
+          max={gamification.score + gamification.xpToNextLevel}
+          showLevel
+          className="w-full"
+        />
       )}
-    </>
+    </div>
   );
 }
 
 /* ──────────────────────────────────────────────────────────────────────────────
-   Dashboard — top-level orchestrator: FirmDahboard vs ClientDashboard
+   Dashboard — top-level orchestrator: FirmDashboard vs ClientDashboard
    ──────────────────────────────────────────────────────────────────────────── */
 
 export function Dashboard() {
   const navigate = useNavigate();
-  const queryClient = useQueryClient();
   const user = useAuthStore((state) => state.user);
   const switchCompany = useAuthStore((state) => state.switchCompany);
   const companyId = user?.companyId;
@@ -595,20 +572,16 @@ export function Dashboard() {
     isFirmUser && hasMultipleCompanies ? 'firm' : 'client',
   );
 
-  const [data, setData] = React.useState<DashboardData | null>(null);
+  const [summary, setSummary] = React.useState<DashboardSummary | null>(null);
   const [loading, setLoading] = React.useState(true);
   const [firmData, setFirmData] = React.useState<FirmDashboardData | null>(null);
   const [firmLoading, setFirmLoading] = React.useState(false);
-  const [showIncomeForm, setShowIncomeForm] = React.useState(false);
-  const [showExpenseForm, setShowExpenseForm] = React.useState(false);
-  const [showNewEntryMenu, setShowNewEntryMenu] = React.useState(false);
 
+  // Derived state from summary — kept as separate state to match the API shape
   const [healthScore, setHealthScore] = React.useState<{ overallScore: number; pillars: Array<{ name: string; score: number; maxScore: number }> } | null>(null);
   const [wizardData, setWizardData] = React.useState<{ percentage: number; completedSteps: number; totalSteps: number; nextStep: { label: string } | null; isComplete: boolean } | null>(null);
-  const [badges, setBadges] = React.useState<Array<{ id: string; name: string; icon: string; earned: boolean }>>([]);
-  const [analytics, setAnalytics] = React.useState<AnalyticsData | null>(null);
 
-  // ── Fetch firm overview data (for firm users) ────────────────────────
+  // ── Fetch firm overview data ──────────────────────────────────────
   React.useEffect(() => {
     if (!isFirmUser || viewMode !== 'firm') return;
 
@@ -629,7 +602,7 @@ export function Dashboard() {
     return () => { cancelled = true; };
   }, [isFirmUser, viewMode]);
 
-  // ── Fetch per-company data (for client view) ─────────────────────────
+  // ── Fetch per-company data (single call to /dashboard/summary) ────
   React.useEffect(() => {
     if (!companyId || viewMode !== 'client') return;
     let cancelled = false;
@@ -637,46 +610,33 @@ export function Dashboard() {
 
     async function load() {
       try {
-        const summary = await api.get<any>('/dashboard/summary');
-
+        const res = await api.get<any>('/dashboard/summary');
         if (cancelled) return;
 
-        const newData: DashboardData = {
-          totalEntries: summary.entries?.total || 0,
-          recentEntries: summary.entries?.recent || [],
+        const newSummary: DashboardSummary = {
+          entries: {
+            total: res.entries?.total || 0,
+            recent: res.entries?.recent || [],
+          },
+          monthlySummary: res.monthlySummary,
+          mpesaUncleaned: res.mpesaUncleaned ?? 0,
+          gamification: res.gamification
+            ? {
+                score: res.gamification.score,
+                level: res.gamification.level,
+                xpToNextLevel: res.gamification.xpToNextLevel,
+              }
+            : undefined,
         };
-        if (summary.gamification) {
-          newData.xpScore = {
-            score: summary.gamification.score,
-            level: summary.gamification.level,
-            xpToNextLevel: summary.gamification.xpToNextLevel,
-          };
-        }
-        setData(newData);
+        setSummary(newSummary);
 
-        if (summary.healthScore) {
-          setHealthScore(summary.healthScore);
-        }
-
-        if (summary.wizard) {
-          setWizardData(summary.wizard);
-        }
-
-        if (summary.badges) {
-          setBadges([
-            ...(summary.badges.earned || []).map((b: any) => ({ ...b, earned: true })),
-            ...(summary.badges.available || []),
-          ]);
-        }
-
-        if (summary.analytics) {
-          setAnalytics(summary.analytics);
-        }
+        if (res.healthScore) setHealthScore(res.healthScore);
+        if (res.wizard) setWizardData(res.wizard);
       } catch (e) {
         console.error('Failed to load dashboard:', e);
       } finally {
         if (!cancelled) {
-          setData((prev) => prev || { totalEntries: 0, recentEntries: [] });
+          setSummary((prev) => prev || { entries: { total: 0, recent: [] } });
           setLoading(false);
         }
       }
@@ -684,24 +644,11 @@ export function Dashboard() {
     load();
 
     return () => { cancelled = true; };
-  }, [companyId, viewMode]); // Re-fetch when company changes OR when switching to client view
-
-  const handleCreateSuccess = () => {
-    setShowIncomeForm(false);
-    setShowExpenseForm(false);
-    setShowNewEntryMenu(false);
-    queryClient.invalidateQueries({ queryKey: ['journal-entries'] });
-    api.get<any>('/ledger/entries?limit=5').then((entries) => {
-      setData((prev) => prev ? { ...prev, totalEntries: entries?.total || 0, recentEntries: entries?.items?.slice(0, 5) || [] } : prev);
-    }).catch(() => {});
-  };
+  }, [companyId, viewMode]);
 
   const handleViewClient = async (client: FirmClient) => {
-    // Switch to that company, then enter client view mode
     const success = await switchCompany(client.id);
-    if (success) {
-      setViewMode('client');
-    }
+    if (success) setViewMode('client');
   };
 
   const handleBackToFirm = () => {
@@ -712,9 +659,7 @@ export function Dashboard() {
     navigate('/team');
   };
 
-  // ── Determine what to render ─────────────────────────────────────────
-  // Show firm overview when:
-  //   - user is a firm role AND has multiple memberships AND viewMode is 'firm'
+  // ── Determine what to render ──────────────────────────────────────
   const showFirmView = isFirmUser && hasMultipleCompanies && viewMode === 'firm';
 
   // Loading state for firm overview
@@ -724,21 +669,18 @@ export function Dashboard() {
   if (showFirmView && firmData) {
     return (
       <div className="flex flex-col gap-5">
-        <IncomeForm isOpen={showIncomeForm} onClose={() => { setShowIncomeForm(false); setShowNewEntryMenu(false); }} onSuccess={handleCreateSuccess} />
-        <ExpenseForm isOpen={showExpenseForm} onClose={() => { setShowExpenseForm(false); setShowNewEntryMenu(false); }} onSuccess={handleCreateSuccess} />
-
         {/* Header */}
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">Firm Dashboard</h1>
+              <h1 className="text-2xl font-bold text-kenya-green-900 dark:text-kenya-green-50">📊 Firm Dashboard</h1>
               {user?.name && (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-kenya-green-100 dark:bg-kenya-green-900/30 text-xs font-medium text-kenya-green-700 dark:text-kenya-green-300">
                   {user.name}
                 </span>
               )}
             </div>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               {firmData.totalClients} client{firmData.totalClients !== 1 ? 's' : ''} · {firmData.needingAttention} needing attention
             </p>
           </div>
@@ -759,46 +701,34 @@ export function Dashboard() {
 
   // Loading state for client view
   if (viewMode === 'client' && loading) return <DashboardSkeleton />;
-  if (viewMode === 'client' && !data) return <DashboardSkeleton />;
+  if (viewMode === 'client' && !summary) return <DashboardSkeleton />;
 
   // Per-company dashboard
-  if (viewMode === 'client' && data) {
+  if (viewMode === 'client' && summary) {
     return (
-      <div className="flex flex-col gap-5">
-        <IncomeForm isOpen={showIncomeForm} onClose={() => { setShowIncomeForm(false); setShowNewEntryMenu(false); }} onSuccess={handleCreateSuccess} />
-        <ExpenseForm isOpen={showExpenseForm} onClose={() => { setShowExpenseForm(false); setShowNewEntryMenu(false); }} onSuccess={handleCreateSuccess} />
-
-        <ClientDashboard
-          data={data}
-          healthScore={healthScore}
-          wizardData={wizardData}
-          badges={badges}
-          analytics={analytics}
-          companyName={companyName}
-          onSwitchToFirm={isFirmUser && hasMultipleCompanies ? handleBackToFirm : undefined}
-          isFirmUser={isFirmUser}
-        />
-      </div>
+      <ClientDashboard
+        summary={summary}
+        healthScore={healthScore}
+        wizardData={wizardData}
+        gamification={summary.gamification ?? null}
+        companyName={companyName}
+        onSwitchToFirm={isFirmUser && hasMultipleCompanies ? handleBackToFirm : undefined}
+        isFirmUser={isFirmUser}
+      />
     );
   }
 
   // Fallback: single-company or no-membership user → show client dashboard directly
   if (!showFirmView && viewMode === 'client') {
     return (
-      <div className="flex flex-col gap-5">
-        <IncomeForm isOpen={showIncomeForm} onClose={() => { setShowIncomeForm(false); setShowNewEntryMenu(false); }} onSuccess={handleCreateSuccess} />
-        <ExpenseForm isOpen={showExpenseForm} onClose={() => { setShowExpenseForm(false); setShowNewEntryMenu(false); }} onSuccess={handleCreateSuccess} />
-
-        <ClientDashboard
-          data={data || { totalEntries: 0, recentEntries: [] }}
-          healthScore={healthScore}
-          wizardData={wizardData}
-          badges={badges}
-          analytics={analytics}
-          companyName={companyName}
-          isFirmUser={isFirmUser}
-        />
-      </div>
+      <ClientDashboard
+        summary={summary || { entries: { total: 0, recent: [] } }}
+        healthScore={healthScore}
+        wizardData={wizardData}
+        gamification={summary?.gamification ?? null}
+        companyName={companyName}
+        isFirmUser={isFirmUser}
+      />
     );
   }
 
