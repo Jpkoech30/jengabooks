@@ -45,7 +45,9 @@ export function Team() {
     try {
       const data = await api.get<Member[]>(`/companies/${companyId}/members`);
       setMembers(data);
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch (err: any) {
+      showToast('error', 'Failed to load team', err?.response?.data?.message || 'Could not load team members');
+    } finally { setLoading(false); }
   };
 
   React.useEffect(() => { loadMembers(); }, [companyId]);

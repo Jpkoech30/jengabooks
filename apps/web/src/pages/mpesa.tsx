@@ -69,14 +69,18 @@ export function MpesaImport() {
       setTransactions(data.items);
       setTotal(data.total);
       setTotalPages(data.totalPages || Math.ceil(data.total / PAGE_LIMIT));
-    } catch { /* ignore */ } finally { setLoading(false); }
+    } catch (err: any) {
+      showToast('error', 'Failed to load transactions', err?.response?.data?.message || 'Could not load M-Pesa transactions');
+    } finally { setLoading(false); }
   };
 
   const loadAccounts = async () => {
     try {
       const data = await api.get<Account[]>('/ledger/accounts');
       setAccounts(data);
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      showToast('error', 'Failed to load accounts', err?.response?.data?.message || 'Could not load chart of accounts');
+    }
   };
 
   React.useEffect(() => {
@@ -139,7 +143,9 @@ export function MpesaImport() {
     try {
       await api.patch(`/mpesa/transactions/${txId}/categorize`, { accountId });
       loadTransactions();
-    } catch { /* ignore */ }
+    } catch (err: any) {
+      showToast('error', 'Failed to categorize', err?.response?.data?.message || 'Could not categorize transaction');
+    }
   };
 
   const formatKES = (amount: number) => `KES ${amount.toLocaleString('en-KE')}`;
