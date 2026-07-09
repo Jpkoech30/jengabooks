@@ -358,9 +358,47 @@
 - **GROUNDING**: Read `.project-context.json`, `CLAUDE.md`, schema.prisma, gamification module, auth guard, app.module.ts before coding
 - **UNIT TEST**: 19/19 new billing tests pass
 
-## Sprint 12.2 � Sandbox / Training Mode
+## Sprint 12.2 � Sandbox / Training Mode
 
-**Commit:** [08bc2e9](jengabooks) � feat(sandbox): add training mode with realistic Kenyan SME sample data
+**Commit:** [08bc2e9](jengabooks) � feat(sandbox): add training mode with realistic Kenyan SME sample data
 
 ### Summary
 Built a sandbox training environment with 3 endpoints (init, reset, status), 47-account Kenyan SME chart of accounts, 200+ M-Pesa transactions, 10 eTIMS invoices, 5 employees, 2 bank statements, and opening balances. Uses DB NOW() for TIME-TRAVEL compliance. 12 unit tests all passing.
+
+## Stage 4 — Security Audit — Full Pipeline Scan (BLOCKED)
+
+**Commit:** [`e4c2b04`](jengabooks) — `chore(security): BLOCKED pipeline - CRITICAL vitest RCE and hardcoded secrets`
+
+### Decision
+❌ **BLOCKED** — 1 CRITICAL vulnerability found (vitest RCE, CVSS 9.8)
+
+### Summary of Findings
+
+| Category | Count | Severity |
+|----------|-------|----------|
+| CRITICAL (vitest RCE) | 1 | 🔴 Pipeline BLOCKED |
+| HIGH (transitive deps) | 18 (root) / 9 (api) | 🟠 Must fix |
+| MODERATE | 42 (root) / 17 (api) | 🟡 Logged |
+| Hardcoded Secrets | 3 | 🔑 Fix required |
+| OWASP Violations | 2 | 🛡️ Fix required |
+
+### Key Issues
+1. **C-1: vitest RCE** (CVSS 9.8) — `GHSA-9crc-q9x8-hgqq`, `GHSA-5xrq-8626-4rwp`
+2. **S-1: JWT fallback secret** — [`audit.module.ts:11`](apps/api/src/modules/audit/audit.module.ts:11): `'jengabooks-dev-secret'`
+3. **OWASP-1: SQL injection** — [`sandbox.service.ts:536`](apps/api/src/modules/sandbox/sandbox.service.ts:536): `$executeRawUnsafe` with string interpolation
+4. **S-2: WhatsApp token fallback** — [`whatsapp.service.ts:36`](apps/api/src/modules/whatsapp/whatsapp.service.ts:36): `'jengabooks_verify_2026'`
+5. **OWASP-2: Unparameterized query** — [`statement-timeout.interceptor.ts:24`](apps/api/src/common/interceptors/statement-timeout.interceptor.ts:24)
+6. **S-3: Dev JWT in .env.example** — [`.env.example:21`](.env.example:21): `jengabooks-dev-jwt-secret-2026`
+
+### Files Changed
+| File | Change | Purpose |
+|------|--------|---------|
+| **NEW** [`security-report.md`](security-report.md) | New file | Full security audit report with remediation steps |
+
+### Scans Performed
+- ✅ `npm audit` — Monorepo root + apps/api
+- ✅ Git diff `v1.0.0..HEAD` — 100+ modified files inspected
+- ✅ Hardcoded secrets detection — All new/modified `.ts` files
+- ✅ OWASP Top 10 — A01, A03, A05, A07, A16 checked
+- ✅ `.gitignore` verification — `.env` and `.env.local` gitignored
+- ✅ DTO validation decorators — `class-validator` present on all new DTOs
