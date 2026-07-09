@@ -21,6 +21,9 @@ describe('SandboxService', () => {
     user: {
       findUnique: jest.fn().mockResolvedValue({ id: 'user_1' }),
     },
+    mpesaTransaction: {
+      createMany: jest.fn().mockResolvedValue({ count: 0 }),
+    },
   });
 
   beforeEach(async () => {

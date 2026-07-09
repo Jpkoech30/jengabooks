@@ -106,6 +106,7 @@ export function SlideOutPanel({
       role="dialog"
       aria-modal="true"
       aria-label={title}
+      onKeyDown={handleKeyDown}
     >
       {/* Backdrop */}
       <div
@@ -118,7 +119,6 @@ export function SlideOutPanel({
       <div
         ref={panelRef}
         tabIndex={-1}
-        onKeyDown={handleKeyDown}
         className={cn(
           'relative flex w-full flex-col bg-white shadow-2xl dark:bg-kenya-surface-dark',
           'sm:w-[440px] lg:w-[480px]',

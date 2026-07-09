@@ -13,6 +13,7 @@ describe('AuditService', () => {
   let prisma: any;
 
   const mockPrisma = {
+    $queryRaw: jest.fn().mockResolvedValue([{ now: new Date('2026-07-08T12:00:00Z') }]),
     auditLock: {
       findFirst: jest.fn(),
       findMany: jest.fn(),

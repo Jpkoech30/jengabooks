@@ -48,6 +48,11 @@ describe('AuthService', () => {
     userLevel: {
       upsert: jest.fn(),
     },
+    refreshToken: {
+      create: jest.fn().mockResolvedValue({ id: 'rt-1', tokenHash: 'hashed-token', userId: 'user-1', expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) }),
+      findUnique: jest.fn(),
+      delete: jest.fn(),
+    },
     $transaction: jest.fn(),
   };
 
@@ -129,6 +134,8 @@ describe('AuthService', () => {
               company: { id: 'new-company', name: 'New Company' },
             }),
           },
+          chartOfAccount: { upsert: jest.fn().mockResolvedValue({}) },
+          categoryRule: { create: jest.fn().mockResolvedValue({}) },
         };
         return cb(tx);
       });

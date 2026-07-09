@@ -252,7 +252,7 @@ describe('Settings Page', () => {
     fireEvent.click(screen.getByText('Danger Zone'));
     fireEvent.click(screen.getByText('Clear Data'));
 
-    expect(screen.getByText('Clear All Imported Data')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Clear All Imported Data' })).toBeInTheDocument();
     expect(screen.getByText('Type DELETE to confirm')).toBeInTheDocument();
   });
 
