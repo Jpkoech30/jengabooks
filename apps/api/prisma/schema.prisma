@@ -42,6 +42,7 @@ model Company {
   comments          Comment[]
   clientTasks       ClientTask[]
   notifications     Notification[]
+  sandbox           Sandbox?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("companies")
@@ -734,5 +735,20 @@ model ExternalAccessLog {
   @@index([accessId])
   @@index([accessId, createdAt])
   @@map("external_access_logs")
+}
+
+
+model Sandbox {
+  id         String   @id @default(uuid())
+  companyId  String   @unique
+  company    Company  @relation(fields: [companyId], references: [id])
+  sampleSize String   @default("MEDIUM")
+  resetCount Int      @default(0)
+  resetToken String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([createdAt])
+  @@map("sandboxes")
 }
 

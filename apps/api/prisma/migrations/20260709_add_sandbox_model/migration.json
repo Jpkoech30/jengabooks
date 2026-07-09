@@ -1,0 +1,18 @@
+{
+  "version": "5.22",
+  "checksum": "auto-generated",
+  "steps": [
+    {
+      "tag": "CreateTable",
+      "sql": "CREATE TABLE \"sandboxes\" (\\n    \"id\" TEXT NOT NULL,\\n    \"companyId\" TEXT NOT NULL,\\n    \"sampleSize\" TEXT NOT NULL DEFAULT 'MEDIUM',\\n    \"resetCount\" INTEGER NOT NULL DEFAULT 0,\\n    \"resetToken\" TEXT NOT NULL,\\n    \"createdAt\" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,\\n    \"updatedAt\" TIMESTAMP(3) NOT NULL,\\n    CONSTRAINT \"sandboxes_pkey\" PRIMARY KEY (\"id\")\\n)"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE UNIQUE INDEX \"sandboxes_companyId_key\" ON \"sandboxes\"(\"companyId\")"
+    },
+    {
+      "tag": "CreateIndex",
+      "sql": "CREATE INDEX \"sandboxes_createdAt_idx\" ON \"sandboxes\"(\"createdAt\")"
+    }
+  ]
+}

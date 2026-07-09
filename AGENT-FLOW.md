@@ -291,3 +291,69 @@
 - **TIME-TRAVEL**: All temporal references use `SELECT NOW()` via `$queryRaw`; no `new Date()` or `Date.now()` in financial calculations. Dates come from ledger `entryDate` / invoice `dueDate` / `paidAt` columns
 - **FEATURE-CREEP**: Only 5 files changed — all within spec
 - **GROUNDING**: Read `.project-context.json`, `CLAUDE.md`, schema.prisma, dashboard module (service/controller/module), wizard module, app.module.ts before coding
+
+---
+
+## Sprint 12.1 — Billing System with Pricing Tiers
+
+**Commit:** [`6431ac4`] — `feat(billing): add subscription system with pricing tiers and feature gating`
+
+### Files Changed
+| File | Change | Purpose |
+|------|--------|---------|
+| [`apps/api/prisma/schema.prisma`](jengabooks/apps/api/prisma/schema.prisma) | Modified | Added `Subscription` model with tier, status, trial, period fields |
+| **NEW** [`apps/api/prisma/migrations/20260709_add_subscription_model/migration.sql`](jengabooks/apps/api/prisma/migrations/20260709_add_subscription_model/migration.sql) | New file | PostgreSQL migration: CREATE TABLE subscriptions with unique companyId |
+| **NEW** [`apps/api/src/modules/billing/billing.module.ts`](jengabooks/apps/api/src/modules/billing/billing.module.ts) | New file | Billing module — registers service, controller, FeatureGuard (exported) |
+| **NEW** [`apps/api/src/modules/billing/billing.service.ts`](jengabooks/apps/api/src/modules/billing/billing.service.ts) | New file | Core service: 4 hardcoded pricing tiers (KES), auto-create TRIAL, tier CRUD, feature checking, TIME-TRAVEL via `SELECT NOW()` |
+| **NEW** [`apps/api/src/modules/billing/billing.controller.ts`](jengabooks/apps/api/src/modules/billing/billing.controller.ts) | New file | 5 endpoints: `GET /plans` (public), `GET /subscription`, `POST /subscription`, `PATCH /subscription/tier`, `POST /subscription/cancel` |
+| **NEW** [`apps/api/src/modules/billing/feature.guard.ts`](jengabooks/apps/api/src/modules/billing/feature.guard.ts) | New file | Route-level guard using `@SetMetadata('requiredFeature', ...)` — returns **402 Payment Required** silently (no upsell) |
+| **NEW** [`apps/api/src/modules/billing/billing.spec.ts`](jengabooks/apps/api/src/modules/billing/billing.spec.ts) | New file | 19 unit tests covering all paths |
+| [`apps/api/src/app.module.ts`](jengabooks/apps/api/src/app.module.ts) | Modified | Registered `BillingModule` |
+
+### Pricing Tiers (KES, hardcoded)
+| Tier | Price | Features |
+|------|-------|----------|
+| **STARTER** | KSh 2,500 | Basic bookkeeping, Invoicing, eTIMS compliance |
+| **PRO** | KSh 5,000 | M-Pesa integration, Payroll, Bank feeds, Client portal |
+| **ENTERPRISE** | KSh 12,000 | Multi-entity, Multi-currency, Advanced reporting, White-label, Priority support |
+| **ACCOUNTANT_PRACTICE** | KSh 15,000 | Up to 50 clients, All features, Bulk actions, Practice dashboard |
+
+### API Endpoints
+- `GET /api/v1/billing/plans` — List all plans (no auth required — transparent pricing)
+- `GET /api/v1/billing/subscription?companyId=xxx` — Get current subscription (auto-creates TRIAL on first access)
+- `POST /api/v1/billing/subscription` — Create/update subscription (body: `{ companyId, tier }`)
+- `PATCH /api/v1/billing/subscription/tier` — Change tier mid-cycle (immediate effect, no proration)
+- `POST /api/v1/billing/subscription/cancel` — Cancel (remains active until period end)
+
+### Edge Cases Handled
+- **No subscription → TRIAL**: First `getSubscription()` or `getFeatureCheck()` auto-creates a TRIAL (14-day trial, 30-day period)
+- **Trial expired**: `trialEndsAt < now` with status `TRIAL` → returns `EXPIRED` status
+- **Tier change mid-cycle**: Simple model — immediate effect, no proration
+- **Cancel**: Status set to `CANCELLED`, `cancelledAt` recorded, `currentPeriodEnd` unchanged (active until period end)
+- **Invalid tier**: `BadRequestException` with descriptive message
+- **Subscription not found**: `NotFoundException` (for operations that require existing subscription)
+
+### Feature Gating
+- **FeatureGuard** — Route-level guard, use `@SetMetadata('requiredFeature', 'feature-name')` + `@UseGuards(FeatureGuard)`
+- Returns **402 Payment Required** (not 403) — signals business requirement to upgrade without upsell dialog
+- Starter: blocked from M-Pesa, Payroll, Multi-entity
+- Pro: blocked from Multi-entity
+- Enterprise / Accountant Practice: all features accessible
+
+### TIME-TRAVEL Compliance
+- All period calculations derive from `SELECT NOW()` via `$queryRaw<{ now: Date }[]>('SELECT NOW()')`
+- `trialEndsAt` = DB now + 14 days
+- `currentPeriodEnd` = DB now + 30 days (or based on `currentPeriodStart` for updates)
+- `@default(now())` handles creation timestamps
+- Zero `new Date()` or `Date.now()` in financial logic
+
+### Test Results
+- **19/19 tests passing** (billing.spec.ts)
+- Coverage: plan listing, auto-create TRIAL, existing subscription, trial expiry, tier CRUD, cancellation, feature checks (positive/negative), invalid inputs, missing subscriptions
+
+### Compliance Checks
+- **SENTINEL**: No TODO, FIXME, MISSING_API_DATA, invented endpoints, fake response shapes, hardcoded secrets
+- **TIME-TRAVEL**: All temporal references use `SELECT NOW()` via `$queryRaw`; no `new Date()` or `Date.now()` in subscription/period logic
+- **FEATURE-CREEP**: Only files listed in the task were created/modified
+- **GROUNDING**: Read `.project-context.json`, `CLAUDE.md`, schema.prisma, gamification module, auth guard, app.module.ts before coding
+- **UNIT TEST**: 19/19 new billing tests pass
