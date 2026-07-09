@@ -1,5 +1,6 @@
 {
   "name": "@jengabooks/api",
+  "version": "1.0.1",
   "private": true,
   "prisma": {
     "seed": "ts-node prisma/seed.ts"

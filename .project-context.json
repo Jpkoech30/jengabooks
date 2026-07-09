@@ -2,9 +2,9 @@
   "project": {
     "name": "JengaBooks",
     "description": "Multi-tenant Kenyan accounting SaaS — M-Pesa first-class citizen, KRA eTIMS integration, AI-powered reconciliation, gamified engagement",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "status": "development",
-    "lastAudited": "2026-07-07"
+    "lastAudited": "2026-07-09"
   },
 
   "workspace": {
@@ -228,6 +228,21 @@
     }
   ],
 
+  "sprintHistory": [
+    {
+      "sprint": "S13",
+      "name": "Security Remediation + Compliance Fix",
+      "version": "1.0.1",
+      "date": "2026-07-09",
+      "tasks": [
+        "13.1 — Security Fix (vitest RCE, secrets, SQL injection)",
+        "13.2 — Compliance Fix (/collab/notifications/count, TIME-TRAVEL)",
+        "13.3 — Payroll DB Schema (Employee, SalaryStructure, PayrollRun, PayrollEntry)",
+        "13.4 — QA E2E Regression (548/548 API, 33/33 frontend)",
+        "13.5 — Release v1.0.1 (tag, changelog)"
+      ]
+    }
+  ],
   "activePlans": [
     "plans/reports-ui-ux-plan.md",
     "plans/ui-styling-implementation-plan.md",
