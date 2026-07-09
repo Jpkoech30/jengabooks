@@ -74,6 +74,18 @@ interface FirmDashboardData {
   clients: FirmClient[];
 }
 
+interface CashFlowForecastData {
+  avgMonthlyIncome: number;
+  avgMonthlyExpenses: number;
+  runwayMonths: number;
+  nextLowPoint: { date: string; balance: number } | null;
+  alerts: Array<{
+    type: 'low_balance' | 'bills_due' | string;
+    severity: 'warning' | 'critical';
+    message: string;
+  }>;
+}
+
 type ViewMode = 'firm' | 'client';
 
 /* ──────────────────────────────────────────────────────────────────────────────
@@ -118,6 +130,128 @@ function HealthDot({ score, size = 'md' }: { score: number | null; size?: 'sm' |
       title={score !== null ? `Health: ${score}/100` : 'No health data'}
       aria-label={`Health score: ${score ?? 'N/A'}`}
     />
+  );
+}
+
+/* ─── Skeleton card for cash flow loading ───────────────────────────── */
+
+function SkeletonMetricCard() {
+  return (
+    <div className="animate-pulse rounded-lg border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-surface-dark">
+      <div className="mb-2 h-3 w-16 rounded bg-kenya-green-100 dark:bg-kenya-green-800" />
+      <div className="h-6 w-24 rounded bg-kenya-green-100 dark:bg-kenya-green-800" />
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────────
+   CashFlowForecast — cash flow forecast widget for client dashboard
+   ──────────────────────────────────────────────────────────────────────────── */
+
+function CashFlowForecast({
+  data,
+  loading,
+  error,
+  onViewFull,
+}: {
+  data: CashFlowForecastData | null;
+  loading: boolean;
+  error: boolean;
+  onViewFull: () => void;
+}) {
+  // API not configured (404/501) → hide entirely
+  if (error && !data) return null;
+
+  // No data yet
+  if (!loading && !data) {
+    return (
+      <Card>
+        <div className="p-4 border-b border-kenya-green-100 dark:border-kenya-green-800">
+          <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">💰 Cash Flow Forecast</h3>
+        </div>
+        <CardContent className="p-6">
+          <p className="text-sm text-gray-500 dark:text-gray-400">Not enough data yet. Start recording transactions to see your cash flow forecast.</p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <div className="p-4 border-b border-kenya-green-100 dark:border-kenya-green-800 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">💰 Cash Flow Forecast</h3>
+      </div>
+      <CardContent className="p-4 space-y-4">
+        {/* Loading skeleton */}
+        {loading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <SkeletonMetricCard />
+            <SkeletonMetricCard />
+            <SkeletonMetricCard />
+            <SkeletonMetricCard />
+          </div>
+        ) : data ? (
+          <>
+            {/* 4 metric cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="rounded-lg border border-gray-100 bg-emerald-50/50 p-3 dark:border-gray-700 dark:bg-emerald-900/10">
+                <p className="text-[10px] uppercase tracking-wider text-gray-500">Avg Income</p>
+                <p className="mt-1 text-base font-bold text-green-700">{formatKES(data.avgMonthlyIncome)}</p>
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-red-50/50 p-3 dark:border-gray-700 dark:bg-red-900/10">
+                <p className="text-[10px] uppercase tracking-wider text-gray-500">Avg Expense</p>
+                <p className="mt-1 text-base font-bold text-red-600">{formatKES(data.avgMonthlyExpenses)}</p>
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-blue-50/50 p-3 dark:border-gray-700 dark:bg-blue-900/10">
+                <p className="text-[10px] uppercase tracking-wider text-gray-500">Runway</p>
+                <p className="mt-1 text-base font-bold text-blue-700">
+                  {data.runwayMonths < 0 ? '0' : data.runwayMonths.toFixed(1)} <span className="text-xs font-normal text-gray-500">months</span>
+                </p>
+              </div>
+              <div className="rounded-lg border border-gray-100 bg-amber-50/50 p-3 dark:border-gray-700 dark:bg-amber-900/10">
+                <p className="text-[10px] uppercase tracking-wider text-gray-500">Next Low Point</p>
+                <p className="mt-1 text-base font-bold text-amber-600">
+                  {data.nextLowPoint
+                    ? new Date(data.nextLowPoint.date).toLocaleDateString('en-KE', { day: 'numeric', month: 'short' })
+                    : 'None'}
+                </p>
+              </div>
+            </div>
+
+            {/* Alerts */}
+            {data.alerts.length > 0 && (
+              <div className="space-y-2">
+                {data.alerts.map((alert, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-start gap-2 rounded-lg p-3 text-sm ${
+                      alert.severity === 'critical'
+                        ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                        : 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                    }`}
+                  >
+                    <span className="mt-0.5 shrink-0" aria-hidden="true">
+                      {alert.severity === 'critical' ? '🔴' : '⚠️'}
+                    </span>
+                    <span>{alert.message}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* View full forecast link */}
+            <div className="pt-1">
+              <button
+                onClick={onViewFull}
+                className="text-xs font-medium text-kenya-green-600 hover:text-kenya-green-700 hover:underline transition-colors"
+              >
+                View Full Forecast →
+              </button>
+            </div>
+          </>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 
@@ -284,6 +418,9 @@ function ClientDashboard({
   companyName,
   onSwitchToFirm,
   isFirmUser,
+  cashFlowData,
+  cashFlowLoading,
+  cashFlowError,
 }: {
   summary: DashboardSummary;
   healthScore: { overallScore: number; pillars: Array<{ name: string; score: number; maxScore: number }> } | null;
@@ -292,6 +429,9 @@ function ClientDashboard({
   companyName?: string;
   onSwitchToFirm?: () => void;
   isFirmUser: boolean;
+  cashFlowData: CashFlowForecastData | null;
+  cashFlowLoading: boolean;
+  cashFlowError: boolean;
 }) {
   const navigate = useNavigate();
   const plainEnglish = useUiStore((state) => state.plainEnglish);
@@ -451,6 +591,14 @@ function ClientDashboard({
         </div>
       )}
 
+      {/* ─── CASH FLOW FORECAST ────────────────────────────────────────── */}
+      <CashFlowForecast
+        data={cashFlowData}
+        loading={cashFlowLoading}
+        error={cashFlowError}
+        onViewFull={() => navigate('/reports')}
+      />
+
       {/* ─── MONTH-END PROGRESS ─────────────────────────────────────────── */}
       {hasTransactions && wizardData && (
         <Card>
@@ -586,6 +734,11 @@ export function Dashboard() {
   const [healthScore, setHealthScore] = React.useState<{ overallScore: number; pillars: Array<{ name: string; score: number; maxScore: number }> } | null>(null);
   const [wizardData, setWizardData] = React.useState<{ percentage: number; completedSteps: number; totalSteps: number; nextStep: { label: string } | null; isComplete: boolean } | null>(null);
 
+  // ── Cash flow forecast state ──────────────────────────────────────
+  const [cashFlowData, setCashFlowData] = React.useState<CashFlowForecastData | null>(null);
+  const [cashFlowLoading, setCashFlowLoading] = React.useState(false);
+  const [cashFlowError, setCashFlowError] = React.useState(false);
+
   // ── Fetch firm overview data ──────────────────────────────────────
   React.useEffect(() => {
     if (!isFirmUser || viewMode !== 'firm') return;
@@ -648,6 +801,35 @@ export function Dashboard() {
     }
     load();
 
+    return () => { cancelled = true; };
+  }, [companyId, viewMode]);
+
+  // ── Fetch cash flow forecast ──────────────────────────────────────
+  React.useEffect(() => {
+    if (!companyId || viewMode !== 'client') return;
+    let cancelled = false;
+    setCashFlowLoading(true);
+    setCashFlowError(false);
+
+    async function loadForecast() {
+      try {
+        const res = await api.get<CashFlowForecastData>('/cashflow/forecast');
+        if (!cancelled) setCashFlowData(res);
+      } catch (e: any) {
+        if (!cancelled) {
+          // API not configured (404/501) → hide widget gracefully
+          if (e?.response?.status === 404 || e?.response?.status === 501) {
+            setCashFlowError(true);
+          } else {
+            console.error('Failed to load cash flow forecast:', e);
+            setCashFlowError(true);
+          }
+        }
+      } finally {
+        if (!cancelled) setCashFlowLoading(false);
+      }
+    }
+    loadForecast();
     return () => { cancelled = true; };
   }, [companyId, viewMode]);
 
@@ -719,6 +901,9 @@ export function Dashboard() {
         companyName={companyName}
         onSwitchToFirm={isFirmUser && hasMultipleCompanies ? handleBackToFirm : undefined}
         isFirmUser={isFirmUser}
+        cashFlowData={cashFlowData}
+        cashFlowLoading={cashFlowLoading}
+        cashFlowError={cashFlowError}
       />
     );
   }
@@ -733,6 +918,9 @@ export function Dashboard() {
         gamification={summary?.gamification ?? null}
         companyName={companyName}
         isFirmUser={isFirmUser}
+        cashFlowData={cashFlowData}
+        cashFlowLoading={cashFlowLoading}
+        cashFlowError={cashFlowError}
       />
     );
   }
