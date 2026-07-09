@@ -204,10 +204,6 @@ export class SandboxService {
     return result[0].now;
   }
 
-  private escapeSql(val: string): string {
-    return val.replace(/'/g, "''");
-  }
-
   // ─── Init ───────────────────────────────────────────────────────────────────
 
   async init(dto: InitSandboxDto, userId: string): Promise<InitSandboxResponse> {
@@ -486,7 +482,24 @@ export class SandboxService {
       'Daniel Kiprop', 'Esther Wambui',
     ];
 
-    const valueRows: string[] = [];
+    const valueRows: Array<{
+      id: string;
+      companyId: string;
+      receiptNo: string;
+      transactionDate: Date;
+      description: string;
+      amount: number;
+      paidIn: number | null;
+      withdrawn: number | null;
+      phoneNumber: string;
+      paybill: string;
+      customerName: string | null;
+      transactionType: string;
+      mappedAccountId: string | null;
+      confidence: number;
+      isReconciled: boolean;
+      createdAt: Date;
+    }> = [];
 
     for (let i = 0; i < count; i++) {
       const pick = weightedPool[Math.floor(Math.random() * weightedPool.length)];
@@ -521,25 +534,30 @@ export class SandboxService {
       else if (template.paybill === '222222') mappedAccountId = accountIds.get('5100') || null; // Office Supplies
       else if (template.direction === 'paidIn') mappedAccountId = accountIds.get('4000') || null; // Sales
 
-      const id = crypto.randomUUID();
-      const paidInStr = paidIn !== null ? paidIn.toString() : 'NULL';
-      const withdrawnStr = withdrawn !== null ? withdrawn.toString() : 'NULL';
-      const customerStr = customerName ? `'${this.escapeSql(customerName)}'` : 'NULL';
-      const mappedStr = mappedAccountId ? `'${mappedAccountId}'` : 'NULL';
-
-      valueRows.push(
-        `('${id}','${companyId}','${receiptNo}','${txDate.toISOString()}','${this.escapeSql(template.description)}',${roundedAmount},${paidInStr},${withdrawnStr},'${phoneNumber}','${template.paybill || ''}',${customerStr},'${template.paybill ? 'PAYBILL' : 'CUSTOMER'}',${mappedStr},0.95,false,'${dbNow.toISOString()}')`,
-      );
+      valueRows.push({
+        id: crypto.randomUUID(),
+        companyId,
+        receiptNo,
+        transactionDate: txDate,
+        description: template.description,
+        amount: roundedAmount,
+        paidIn,
+        withdrawn,
+        phoneNumber,
+        paybill: template.paybill || '',
+        customerName,
+        transactionType: template.paybill ? 'PAYBILL' : 'CUSTOMER',
+        mappedAccountId,
+        confidence: 0.95,
+        isReconciled: false,
+        createdAt: dbNow,
+      });
       created++;
 
       if (valueRows.length >= BATCH_SIZE || i === count - 1) {
-        await this.prisma.$executeRawUnsafe(`
-          INSERT INTO mpesa_transactions
-            (id, "companyId", "receiptNo", "transactionDate", description, amount,
-             "paidIn", withdrawn, "phoneNumber", paybill, "customerName",
-             "transactionType", "mappedAccountId", confidence, "isReconciled", "createdAt")
-          VALUES ${valueRows.join(',\n')}
-        `);
+        await this.prisma.mpesaTransaction.createMany({
+          data: valueRows,
+        });
         valueRows.length = 0;
       }
     }

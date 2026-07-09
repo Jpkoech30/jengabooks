@@ -21,7 +21,7 @@ export class StatementTimeoutInterceptor implements NestInterceptor {
     
     // Execute SET statement_timeout for PostgreSQL query timeout
     return from(
-      this.prisma.$executeRawUnsafe(`SET statement_timeout = ${timeout}`)
+      this.prisma.$executeRaw`SELECT set_config('statement_timeout', ${String(timeout)}, true)`
     ).pipe(
       switchMap(() => {
         request.statementTimeout = timeout;

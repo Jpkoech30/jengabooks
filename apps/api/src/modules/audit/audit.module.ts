@@ -8,7 +8,7 @@ import { LockDownGuard } from './guards/lock-down.guard';
 @Module({
   imports: [
     JwtModule.register({
-      secret: process.env.JWT_SECRET || 'jengabooks-dev-secret',
+      secret: process.env.JWT_SECRET || (() => { throw new Error('JWT_SECRET must be set in production'); })(),
       signOptions: { expiresIn: '1h' },
     }),
   ],

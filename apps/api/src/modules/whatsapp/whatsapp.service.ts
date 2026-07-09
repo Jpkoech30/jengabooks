@@ -33,7 +33,7 @@ export class WhatsAppService {
     private readonly configService: ConfigService,
     private readonly httpService: HttpService,
   ) {
-    this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN') || 'jengabooks_verify_2026';
+    this.verifyToken = this.configService.get<string>('WHATSAPP_VERIFY_TOKEN') || '';
     this.phoneNumberId = this.configService.get<string>('WHATSAPP_PHONE_NUMBER_ID') || '';
     this.accessToken = this.configService.get<string>('WHATSAPP_ACCESS_TOKEN') || '';
     this.apiVersion = this.configService.get<string>('WHATSAPP_API_VERSION') || 'v18.0';
@@ -53,6 +53,10 @@ export class WhatsAppService {
    * Meta sends a GET request with `hub.verify_token` and `hub.challenge`.
    */
   verifyWebhook(mode: string | undefined, token: string | undefined, challenge: string | undefined): string | null {
+    if (!this.verifyToken) {
+      this.logger.warn('WHATSAPP_VERIFY_TOKEN not configured — rejecting webhook verification');
+      return null;
+    }
     if (mode === 'subscribe' && token === this.verifyToken) {
       this.logger.log('Webhook verified successfully');
       return challenge || null;
