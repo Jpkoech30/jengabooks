@@ -31,6 +31,7 @@ const Employees = lazy(() => import('./pages/employees').then((m) => ({ default:
 const PracticeHub = lazy(() => import('./pages/practice').then((m) => ({ default: m.PracticeHub })));
 const Tasks = lazy(() => import('./pages/tasks').then((m) => ({ default: m.Tasks })));
 const Audit = lazy(() => import('./pages/audit').then((m) => ({ default: m.Audit })));
+const Documents = lazy(() => import('./pages/documents').then((m) => ({ default: m.Documents })));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -153,6 +154,7 @@ function App() {
               <Route path="/payroll" element={<Payroll />} />
               <Route path="/employees" element={<Employees />} />
               <Route path="/practice" element={<PracticeHub />} />
+              <Route path="/documents" element={<Documents />} />
               <Route path="/audit" element={<Audit />} />
               <Route path="*" element={<NotFound />} />
             </Routes>

@@ -63,6 +63,7 @@ const sections: NavSection[] = [
     label: 'SETTINGS',
     id: 'settings',
     items: [
+      { to: '/documents', label: 'Documents', icon: '📄' },
       { to: '/team', label: 'Team', icon: '👥' },
       { to: '/settings', label: 'Settings', icon: '⚙️' },
     ],
