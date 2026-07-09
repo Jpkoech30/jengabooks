@@ -58,6 +58,7 @@ const categories: ReportCategory[] = [
     reports: [
       { id: '5', name: 'Tax Summary', description: 'VAT and withholding tax summary', icon: '🧾', popular: true },
       { id: '7', name: 'eTIMS Compliance', description: 'KRA eTIMS submission status tracker', icon: '🛡️', popular: true },
+      { id: '9', name: 'VAT Return Summary', description: 'VAT filing preparation with KRA iTax-compatible export', icon: '📄', popular: true, endpoint: '/tax/vat' },
     ],
   },
   {
@@ -443,7 +444,9 @@ export function Reports() {
         </div>
 
         {/* Config + Result */}
-        {selectedTemplate && (
+        {selectedReport === '9' ? (
+          <VatReturnSummary />
+        ) : selectedTemplate && (
           <div ref={configRef} className="grid grid-cols-1 lg:grid-cols-2 gap-6 scroll-mt-4">
             <Card>
               <CardContent className="p-5">
@@ -660,8 +663,410 @@ function Row({ label, value, bold }: { label: string; value: number; bold?: bool
     <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800 last:border-0">
       <span className="text-sm text-gray-600 dark:text-gray-400">{label}</span>
       <span className={`text-sm font-mono ${bold ? 'font-bold text-kenya-green-700 dark:text-kenya-green-300' : 'font-medium'}`}>
-        KES {value?.toLocaleString() || '0'}
+        {formatKES(value)}
       </span>
+    </div>
+  );
+}
+
+// ─── VAT Return Summary Component ────────────────────────────────────
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+interface VatData {
+  outputVatStandard16: number;
+  outputVatZeroRated: number;
+  outputVatExempt: number;
+  totalOutputVat: number;
+  inputVatStandard16: number;
+  inputVatReduced8: number;
+  totalInputVat: number;
+  netVatPayable: number;
+  period: string;
+}
+
+interface FilingRecord {
+  period: string;
+  filedAt: string;
+}
+
+const FILING_STORAGE_KEY = 'jengabooks_vat_filings';
+
+function getFilingRecord(period: string): FilingRecord | null {
+  try {
+    const raw = localStorage.getItem(FILING_STORAGE_KEY);
+    if (!raw) return null;
+    const records: FilingRecord[] = JSON.parse(raw);
+    return records.find((r) => r.period === period) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function saveFilingRecord(period: string): void {
+  try {
+    const raw = localStorage.getItem(FILING_STORAGE_KEY);
+    const records: FilingRecord[] = raw ? JSON.parse(raw) : [];
+    const existing = records.findIndex((r) => r.period === period);
+    const record: FilingRecord = { period, filedAt: new Date().toISOString() };
+    if (existing >= 0) {
+      records[existing] = record;
+    } else {
+      records.push(record);
+    }
+    localStorage.setItem(FILING_STORAGE_KEY, JSON.stringify(records));
+  } catch {
+    // silently fail
+  }
+}
+
+function calculateDeadline(year: number, month: number): Date {
+  // Period end is the last day of the selected month
+  // Deadline is the 20th of the month after period end
+  const deadlineMonth = month + 1; // month after the period end
+  const deadlineYear = deadlineMonth > 11 ? year + 1 : year;
+  return new Date(deadlineYear, deadlineMonth > 11 ? 0 : deadlineMonth, 20);
+}
+
+function isFuturePeriod(year: number, month: number): boolean {
+  const now = new Date();
+  const nowYear = now.getFullYear();
+  const nowMonth = now.getMonth();
+  if (year > nowYear) return true;
+  if (year === nowYear && month > nowMonth) return true;
+  return false;
+}
+
+function generateKraCsv(data: VatData): string {
+  const rows: string[] = [];
+
+  // Header row — KRA iTax compatible
+  rows.push('VAT TYPE,RATE,AMOUNT,DESCRIPTION');
+
+  // Output VAT
+  rows.push(`OUTPUT,16%,${data.outputVatStandard16.toFixed(2)},"Standard rated sales (16%)"`);
+  rows.push(`OUTPUT,0%,${data.outputVatZeroRated.toFixed(2)},"Zero-rated sales"`);
+  rows.push(`OUTPUT,EXEMPT,${data.outputVatExempt.toFixed(2)},"Exempt sales"`);
+  rows.push(`OUTPUT,TOTAL,${data.totalOutputVat.toFixed(2)},"Total Output VAT"`);
+
+  // Input VAT
+  rows.push(`INPUT,16%,${data.inputVatStandard16.toFixed(2)},"Standard rated purchases (16%)"`);
+  rows.push(`INPUT,8%,${data.inputVatReduced8.toFixed(2)},"Reduced rate purchases (8%)"`);
+  rows.push(`INPUT,TOTAL,${data.totalInputVat.toFixed(2)},"Total Input VAT"`);
+
+  // Summary row
+  rows.push('');
+  rows.push(`NET VAT PAYABLE,,,${data.netVatPayable.toFixed(2)}`);
+
+  return rows.join('\n');
+}
+
+function VatReturnSummary() {
+  const plainEnglish = useUiStore((state) => state.plainEnglish);
+  const now = new Date();
+  const [year, setYear] = React.useState(now.getFullYear());
+  const [month, setMonth] = React.useState(now.getMonth());
+  const [loading, setLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  const [vatData, setVatData] = React.useState<VatData | null>(null);
+  const [downloadBusy, setDownloadBusy] = React.useState(false);
+
+  const periodKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+  const futurePeriod = isFuturePeriod(year, month);
+  const filingRecord = getFilingRecord(periodKey);
+  const deadline = calculateDeadline(year, month);
+  const deadlineFormatted = deadline.toLocaleDateString('en-KE', { year: 'numeric', month: 'long', day: 'numeric' });
+
+  const fetchVat = React.useCallback(async () => {
+    if (futurePeriod) {
+      setVatData(null);
+      setError(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    setVatData(null);
+    try {
+      const periodStart = new Date(year, month, 1);
+      const periodEnd = new Date(year, month + 1, 0, 23, 59, 59);
+      const from = periodStart.toISOString();
+      const to = periodEnd.toISOString();
+      const result = await api.get<any>('/tax/vat', { from, to });
+      // Normalise response — handle both camelCase and snake_case
+      const d: VatData = {
+        outputVatStandard16: result.outputVatStandard16 ?? result.output_vat_standard_16 ?? 0,
+        outputVatZeroRated: result.outputVatZeroRated ?? result.output_vat_zero_rated ?? 0,
+        outputVatExempt: result.outputVatExempt ?? result.output_vat_exempt ?? 0,
+        totalOutputVat: result.totalOutputVat ?? result.total_output_vat ?? 0,
+        inputVatStandard16: result.inputVatStandard16 ?? result.input_vat_standard_16 ?? 0,
+        inputVatReduced8: result.inputVatReduced8 ?? result.input_vat_reduced_8 ?? 0,
+        totalInputVat: result.totalInputVat ?? result.total_input_vat ?? 0,
+        netVatPayable: result.netVatPayable ?? result.net_vat_payable ?? 0,
+        period: periodKey,
+      };
+      setVatData(d);
+    } catch (e: any) {
+      const msg = e?.response?.data?.message || 'Could not load VAT data. Please try again.';
+      setError(msg);
+      showToast('error', 'VAT Data Error', msg);
+    } finally {
+      setLoading(false);
+    }
+  }, [year, month, futurePeriod, periodKey]);
+
+  // Auto-fetch on period change
+  React.useEffect(() => {
+    fetchVat();
+  }, [fetchVat]);
+
+  const handleMarkAsFiled = () => {
+    saveFilingRecord(periodKey);
+    showToast('success', 'Filed', `VAT return for ${MONTHS[month]} ${year} marked as filed`);
+    // Force re-render to update filing status
+    setVatData((prev) => prev ? { ...prev } : prev);
+  };
+
+  const handleDownloadKraCsv = () => {
+    if (!vatData) return;
+    setDownloadBusy(true);
+    try {
+      const csv = generateKraCsv(vatData);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `kra-vat-return-${periodKey}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      showToast('success', 'Downloaded', 'KRA iTax-compatible CSV exported');
+    } catch {
+      showToast('error', 'Export Failed', 'Could not generate CSV file');
+    } finally {
+      setDownloadBusy(false);
+    }
+  };
+
+  const isEmpty =
+    vatData &&
+    vatData.outputVatStandard16 === 0 &&
+    vatData.outputVatZeroRated === 0 &&
+    vatData.outputVatExempt === 0 &&
+    vatData.inputVatStandard16 === 0 &&
+    vatData.inputVatReduced8 === 0;
+
+  // Generate years for selector (current year - 2 to current year + 1)
+  const years = React.useMemo(() => {
+    const y = now.getFullYear();
+    return [y - 2, y - 1, y, y + 1];
+  }, [now]);
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Config panel */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xl">📄</span>
+            <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
+              VAT Return — Period Selector
+            </h3>
+          </div>
+
+          {/* Month / Year selector */}
+          <div className="flex flex-col gap-4">
+            <div>
+              <label className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-2 block">VAT Period</label>
+              <div className="flex gap-3">
+                <div className="flex-1">
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Month</label>
+                  <select
+                    value={month}
+                    onChange={(e) => setMonth(Number(e.target.value))}
+                    className="w-full h-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-kenya-green-500"
+                  >
+                    {MONTHS.map((name, idx) => (
+                      <option key={idx} value={idx}>{name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="w-28">
+                  <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Year</label>
+                  <select
+                    value={year}
+                    onChange={(e) => setYear(Number(e.target.value))}
+                    className="w-full h-12 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-kenya-green-500"
+                  >
+                    {years.map((y) => (
+                      <option key={y} value={y}>{y}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {futurePeriod && (
+              <div className="rounded-lg bg-kenya-amber-50 dark:bg-kenya-amber-900/20 border border-kenya-amber-200 dark:border-kenya-amber-800 p-3 text-sm text-kenya-amber-700 dark:text-kenya-amber-300">
+                ⏳ This period is in the future. VAT calculation is only available for completed periods.
+              </div>
+            )}
+
+            <div className="flex gap-2 text-xs text-gray-500 dark:text-gray-400">
+              <span>Filing deadline:</span>
+              <span className="font-medium text-gray-700 dark:text-gray-300">{deadlineFormatted}</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Result panel */}
+      <Card>
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-semibold text-kenya-green-900 dark:text-kenya-green-50">
+              VAT Return — {MONTHS[month]} {year}
+            </h3>
+            {vatData && !isEmpty && (
+              <Button variant="ghost" size="sm" onClick={handleDownloadKraCsv} disabled={downloadBusy}>
+                {downloadBusy ? '⏳' : '📥'} Download CSV
+              </Button>
+            )}
+          </div>
+
+          {/* Loading state */}
+          {loading && (
+            <div className="space-y-3 py-4">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-2/3" />
+              <Skeleton className="h-4 w-3/5" />
+            </div>
+          )}
+
+          {/* Error state */}
+          {error && !loading && (
+            <div className="py-6 text-center">
+              <p className="text-3xl mb-2">⚠️</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Failed to load VAT data</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-4">{error}</p>
+              <Button variant="secondary" size="sm" onClick={fetchVat}>
+                🔄 Retry
+              </Button>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!loading && !error && isEmpty && (
+            <div className="py-6 text-center">
+              <p className="text-3xl mb-2">📭</p>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">No transactions in this period</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">There are no VAT-related transactions for {MONTHS[month]} {year}. Try a different period.</p>
+            </div>
+          )}
+
+          {/* Future period state */}
+          {!loading && !error && futurePeriod && (
+            <div className="py-10 text-center">
+              <p className="text-3xl mb-2">📅</p>
+              <p className="text-sm text-gray-400">Select a completed period to view VAT data</p>
+            </div>
+          )}
+
+          {/* Initial state */}
+          {!loading && !error && !vatData && !futurePeriod && (
+            <div className="py-10 text-center text-gray-400">
+              <p className="text-3xl mb-2">📄</p>
+              <p className="text-sm">Select a period to calculate VAT</p>
+            </div>
+          )}
+
+          {/* VAT data card */}
+          {!loading && !error && vatData && !isEmpty && (
+            <div className="space-y-4">
+              {/* Output VAT */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Output VAT (Sales)</h4>
+                <div className="space-y-1">
+                  <Row label="Standard 16%" value={vatData.outputVatStandard16} />
+                  <Row label="Zero-rated" value={vatData.outputVatZeroRated} />
+                  <Row label="Exempt" value={vatData.outputVatExempt} />
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Total Output VAT</span>
+                    <span className="text-sm font-mono font-bold text-kenya-green-700 dark:text-kenya-green-300">
+                      {formatKES(vatData.totalOutputVat)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Input VAT */}
+              <div>
+                <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">Input VAT (Purchases)</h4>
+                <div className="space-y-1">
+                  <Row label="Standard 16%" value={vatData.inputVatStandard16} />
+                  <Row label="Reduced 8%" value={vatData.inputVatReduced8} />
+                  <div className="flex justify-between py-2 border-b border-gray-100 dark:border-gray-800">
+                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">Total Input VAT</span>
+                    <span className="text-sm font-mono font-bold text-kenya-green-700 dark:text-kenya-green-300">
+                      {formatKES(vatData.totalInputVat)}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="border-t border-dashed border-gray-300 dark:border-gray-600" />
+
+              {/* Net VAT Payable */}
+              <div className="flex justify-between py-2">
+                <span className="text-sm font-bold text-gray-900 dark:text-white">NET VAT PAYABLE</span>
+                <span className="text-sm font-mono font-bold text-lg text-kenya-amber-600 dark:text-kenya-amber-400">
+                  {formatKES(vatData.netVatPayable)}
+                </span>
+              </div>
+
+              {/* Filing Status */}
+              <div className="flex items-center justify-between py-2 border-t border-gray-100 dark:border-gray-800">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Filing Status</span>
+                {filingRecord ? (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-green-100 dark:bg-green-900/30 px-3 py-1 text-xs font-medium text-green-700 dark:text-green-400">
+                    ✅ Filed on {new Date(filingRecord.filedAt).toLocaleDateString('en-KE', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-kenya-amber-100 dark:bg-kenya-amber-900/30 px-3 py-1 text-xs font-medium text-kenya-amber-700 dark:text-kenya-amber-300">
+                    📄 Not yet filed
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between py-1">
+                <span className="text-sm text-gray-600 dark:text-gray-400">Filing Deadline</span>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{deadlineFormatted}</span>
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex gap-3 pt-2">
+                {!filingRecord && (
+                  <Button variant="secondary" size="sm" onClick={handleMarkAsFiled} className="flex-1">
+                    ✓ Mark as Filed
+                  </Button>
+                )}
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleDownloadKraCsv}
+                  disabled={downloadBusy}
+                  className="flex-1"
+                >
+                  {downloadBusy ? '⏳' : '📥'} Download KRA CSV
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
