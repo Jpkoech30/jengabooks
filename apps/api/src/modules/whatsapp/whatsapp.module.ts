@@ -1,0 +1,17 @@
+import { Module } from '@nestjs/common';
+import { HttpModule } from '@nestjs/axios';
+import { WhatsAppController } from './whatsapp.controller';
+import { WhatsAppService } from './whatsapp.service';
+
+@Module({
+  imports: [
+    HttpModule.register({
+      timeout: 15000,
+      maxRedirects: 2,
+    }),
+  ],
+  controllers: [WhatsAppController],
+  providers: [WhatsAppService],
+  exports: [WhatsAppService],
+})
+export class WhatsAppModule {}

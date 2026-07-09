@@ -27,6 +27,7 @@ import { AuditModule } from './modules/audit/audit.module';
 import { CashflowModule } from './modules/cashflow/cashflow.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { SandboxModule } from './modules/sandbox/sandbox.module';
+import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
 
 @Module({
   imports: [
@@ -68,6 +69,7 @@ import { SandboxModule } from './modules/sandbox/sandbox.module';
     CashflowModule,
     BillingModule,
     SandboxModule,
+    WhatsAppModule,
   ],
   providers: [
     {
