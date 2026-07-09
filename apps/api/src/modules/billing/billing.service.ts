@@ -66,7 +66,7 @@ export class BillingService {
     if (
       subscription.status === 'TRIAL' &&
       subscription.trialEndsAt &&
-      new Date(subscription.trialEndsAt) < new Date()
+      new Date(subscription.trialEndsAt) < (await this.getDbNow())
     ) {
       this.logger.log(`Trial expired for company ${companyId} — setting status to EXPIRED`);
       subscription = await this.prisma.subscription.update({
@@ -145,11 +145,12 @@ export class BillingService {
       throw new NotFoundException(`No subscription found for company ${companyId}`);
     }
 
+    const dbNow = await this.getDbNow();
     await this.prisma.subscription.update({
       where: { companyId },
       data: {
         status: 'CANCELLED',
-        cancelledAt: new Date(),
+        cancelledAt: dbNow,
       },
     });
 

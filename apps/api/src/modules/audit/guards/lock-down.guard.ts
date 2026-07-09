@@ -69,11 +69,12 @@ export class LockDownGuard implements CanActivate {
         `[LOCK_OVERRIDE] Accountant ${user.userId} overriding lock for company ${user.companyId} on date ${entryDate}. Reason: ${unlockReason}`,
       );
 
+      const dbNow = await this.auditService.getDbNow();
       // Attach lock override info to request for audit logging
       request.lockOverride = {
         overrideReason: unlockReason,
         lockIds: activeLocks.map((l: any) => l.id),
-        overriddenAt: new Date(),
+        overriddenAt: dbNow,
       };
 
       return true;

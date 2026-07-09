@@ -46,6 +46,7 @@ export class AuditService {
       );
     }
 
+    const dbNow = await this.getDbNow();
     return this.prisma.auditLock.create({
       data: {
         companyId: dto.companyId,
@@ -55,7 +56,7 @@ export class AuditService {
         lockType: dto.lockType,
         status: 'LOCKED',
         lockedById,
-        lockedAt: new Date(), // DB timestamp for audit trail
+        lockedAt: dbNow, // DB timestamp for audit trail
         modules: dto.modules ?? [],
       },
       include: {
@@ -333,16 +334,17 @@ export class AuditService {
       throw new ForbiddenException('Access has been revoked. Contact the company administrator.');
     }
 
-    if (new Date() > grant.expiresAt) {
+    if (grant.expiresAt < (await this.getDbNow())) {
       throw new ForbiddenException(
         `Access token expired on ${grant.expiresAt.toISOString()}. Request a new access grant.`,
       );
     }
 
+    const dbNow = await this.getDbNow();
     // Update last accessed timestamp
     await this.prisma.externalAccess.update({
       where: { id: grant.id },
-      data: { lastAccessedAt: new Date() },
+      data: { lastAccessedAt: dbNow },
     });
 
     // Log the authentication event
@@ -357,5 +359,16 @@ export class AuditService {
       // Short-lived JWT: 1 hour for external users
       expiresIn: 3600,
     };
+  }
+
+  // ─── Internal Helpers ─────────────────────────────────────────────────
+
+  /**
+   * Gets the current database timestamp for TIME-TRAVEL compliant operations.
+   * All audit timestamps derive from this single DB-source of truth.
+   */
+  async getDbNow(): Promise<Date> {
+    const result = await this.prisma.$queryRaw<Array<{ now: Date }>>`SELECT NOW() as now`;
+    return result[0].now;
   }
 }
