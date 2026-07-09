@@ -100,7 +100,13 @@ export function Header({ onToggleSidebar }: HeaderProps) {
     setShowCompanySwitcher(false);
     const success = await switchCompany(companyId);
     if (success) {
-      queryClient.invalidateQueries();
+      // Scope invalidation to non-auth queries to avoid cache blast
+      queryClient.invalidateQueries({
+        predicate: (query) => {
+          const key = String(query.queryKey[0]);
+          return !key.startsWith('auth');
+        },
+      });
       navigate('/', { replace: true });
     }
   };

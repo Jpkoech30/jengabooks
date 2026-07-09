@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { useViewModeStore } from './view-mode-store';
 
 export interface Membership {
   companyId: string;
@@ -153,6 +154,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         token: null,
         isLoading: false,
       });
+      // Reset view-mode to 'firm' on company switch so the user starts at Firm Overview
+      useViewModeStore.getState().reset();
       return true;
     } catch (err) {
       set({

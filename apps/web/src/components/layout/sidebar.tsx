@@ -172,7 +172,9 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <p className="text-xs text-kenya-green-100">
             {viewMode === 'client' && activeClient
               ? activeClient.name
-              : 'Accounting SaaS'}
+              : viewMode === 'firm'
+                ? 'Firm Overview'
+                : 'Accounting SaaS'}
           </p>
         </div>
       </div>

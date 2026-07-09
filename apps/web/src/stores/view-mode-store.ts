@@ -12,10 +12,11 @@ interface ViewModeState {
   activeClient: ActiveClient | null;
   setMode: (mode: ViewMode) => void;
   setActiveClient: (client: ActiveClient | null) => void;
+  reset: () => void;
 }
 
 export const useViewModeStore = create<ViewModeState>((set) => ({
-  mode: 'client',
+  mode: 'firm', // Changed from 'client' — safer default, avoids ambiguous state
   activeClient: null,
   setMode: (mode) => {
     set({ mode });
@@ -29,6 +30,7 @@ export const useViewModeStore = create<ViewModeState>((set) => ({
     window.history.replaceState({}, '', url.toString());
   },
   setActiveClient: (client) => set({ activeClient: client }),
+  reset: () => set({ mode: 'firm', activeClient: null }),
 }));
 
 /**
