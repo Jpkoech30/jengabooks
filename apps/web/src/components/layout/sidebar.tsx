@@ -35,6 +35,22 @@ const sections: NavSection[] = [
     ],
   },
   {
+    label: 'PAYROLL',
+    id: 'payroll',
+    items: [
+      { to: '/employees', label: 'Employees', icon: '👤' },
+      { to: '/payroll', label: 'Payroll', icon: '💰' },
+    ],
+  },
+  {
+    label: 'PRACTICE',
+    id: 'practice',
+    items: [
+      { to: '/practice', label: 'Practice Hub', icon: '🏢' },
+      { to: '/audit', label: 'Audit & Compliance', icon: '🛡️' },
+    ],
+  },
+  {
     label: 'COMPLIANCE',
     id: 'compliance',
     items: [
