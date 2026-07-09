@@ -1,5 +1,6 @@
-import { Controller, Get, Post, Patch, Body, Param, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Body, Param, UseGuards, Req, ValidationPipe } from '@nestjs/common';
 import { EtimsService } from './etims.service';
+import { ValidatePinDto } from './dto/validate-pin.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('etims')
@@ -30,6 +31,16 @@ export class EtimsController {
     notes?: string;
   }) {
     return this.etimsService.createInvoice(req.user.companyId, body);
+  }
+
+  // ─── KRA PIN Validation ────────────────────────────────────────────────
+
+  @Post('validate-pin')
+  validatePin(@Body(ValidationPipe) dto: ValidatePinDto) {
+    return this.etimsService.validatePin({
+      kraPin: dto.kraPin,
+      supplierName: dto.supplierName,
+    });
   }
 
   // ─── eTIMS Submissions ─────────────────────────────────────────────────

@@ -292,4 +292,89 @@ describe('EtimsService', () => {
       expect(pollJobId('inv-1')).toBe('poll:inv-1');
     });
   });
+
+  // ─── KRA PIN Validation ──────────────────────────────────────────────
+
+  describe('validatePin', () => {
+    /**
+     * Note: validatePin creates its own Redis client lazily.
+     * Since no REDIS_HOST is set in test env, Redis client creation
+     * will be attempted and may fail gracefully (redisAvailable = false),
+     * falling through to mock responses.
+     */
+
+    it('should return ACTIVE for a valid P-prefix PIN (mock mode)', async () => {
+      const result = await service.validatePin({ kraPin: 'P051234567Z' });
+      expect(result.valid).toBe(true);
+      expect(result.status).toBe('ACTIVE');
+      expect(result.etimsCompliant).toBe(true);
+      expect(result.validationErrors).toEqual([]);
+      expect(result.kraPin).toBe('P051234567Z');
+    });
+
+    it('should normalize lowercase PIN to uppercase', async () => {
+      const result = await service.validatePin({ kraPin: 'p051234567z' });
+      expect(result.kraPin).toBe('P051234567Z');
+      expect(result.valid).toBe(true);
+      expect(result.status).toBe('ACTIVE');
+    });
+
+    it('should return NOT_FOUND for X-prefix PIN', async () => {
+      const result = await service.validatePin({ kraPin: 'X051234567Z' });
+      expect(result.valid).toBe(false);
+      expect(result.status).toBe('NOT_FOUND');
+      expect(result.etimsCompliant).toBe(false);
+      expect(result.validationErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should return INACTIVE for non-P, non-X prefix PIN', async () => {
+      const result = await service.validatePin({ kraPin: 'A123456789B' });
+      expect(result.valid).toBe(false);
+      expect(result.status).toBe('INACTIVE');
+      expect(result.etimsCompliant).toBe(false);
+      expect(result.validationErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should preserve supplierName in result', async () => {
+      // X-prefix PIN returns NOT_FOUND which uses supplierName || null
+      const result = await service.validatePin({
+        kraPin: 'X051234567Z',
+        supplierName: 'Acme Suppliers Ltd',
+      });
+      expect(result.supplierName).toBe('Acme Suppliers Ltd');
+      expect(result.valid).toBe(false);
+      expect(result.status).toBe('NOT_FOUND');
+    });
+
+    it('should reject PIN that is too short (format error, no API call)', async () => {
+      const result = await service.validatePin({ kraPin: 'P05123456' });
+      expect(result.valid).toBe(false);
+      expect(result.status).toBe('NOT_FOUND');
+      expect(result.validationErrors.length).toBeGreaterThan(0);
+      expect(result.validationErrors[0]).toContain('exactly 11');
+    });
+
+    it('should reject PIN with only letters (no digits)', async () => {
+      const result = await service.validatePin({ kraPin: 'ABCDEFGHIJK' });
+      expect(result.valid).toBe(false);
+      expect(result.validationErrors.length).toBeGreaterThan(0);
+      expect(result.validationErrors.some((e) => e.includes('digit'))).toBe(true);
+    });
+
+    it('should reject PIN with spaces', async () => {
+      const result = await service.validatePin({ kraPin: 'P0512 34567Z' });
+      // Should fail regex: contains space and is less than 11 chars after normalization
+      expect(result.valid).toBe(false);
+      expect(result.validationErrors.length).toBeGreaterThan(0);
+    });
+
+    it('should handle nullish supplierName gracefully', async () => {
+      const result = await service.validatePin({
+        kraPin: 'X051234567Z',
+        supplierName: undefined,
+      });
+      // NOT_FOUND returns supplierName as null when undefined
+      expect(result.supplierName).toBeNull();
+    });
+  });
 });

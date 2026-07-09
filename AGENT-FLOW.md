@@ -357,3 +357,10 @@
 - **FEATURE-CREEP**: Only files listed in the task were created/modified
 - **GROUNDING**: Read `.project-context.json`, `CLAUDE.md`, schema.prisma, gamification module, auth guard, app.module.ts before coding
 - **UNIT TEST**: 19/19 new billing tests pass
+
+## Sprint 12.2 — Sandbox / Training Mode
+
+**Commit:** [08bc2e9](jengabooks) — feat(sandbox): add training mode with realistic Kenyan SME sample data
+
+### Summary
+Built a sandbox training environment with 3 endpoints (init, reset, status), 47-account Kenyan SME chart of accounts, 200+ M-Pesa transactions, 10 eTIMS invoices, 5 employees, 2 bank statements, and opening balances. Uses DB NOW() for TIME-TRAVEL compliance. 12 unit tests all passing.
