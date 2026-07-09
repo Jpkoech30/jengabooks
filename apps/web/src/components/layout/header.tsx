@@ -357,7 +357,7 @@ export function Header({ onToggleSidebar }: HeaderProps) {
 
               <div className="py-1">
                 <button
-                  onClick={() => { navigate('/profile'); setShowProfileMenu(false); }}
+                  onClick={() => { navigate('/settings'); setShowProfileMenu(false); }}
                   className="touch-target flex w-full items-center gap-3 px-4 py-3 text-sm text-kenya-gray-900 hover:bg-kenya-gray-50 dark:text-kenya-green-50 dark:hover:bg-kenya-green-900/30"
                 >
                   <span className="text-base">👤</span>

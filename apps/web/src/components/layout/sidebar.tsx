@@ -60,12 +60,21 @@ const sections: NavSection[] = [
     ],
   },
   {
+    label: 'REPORTS',
+    id: 'reports',
+    items: [
+      { to: '/reports', label: 'Financial Reports', icon: '📊' },
+      { to: '/workflow', label: 'Monthly Workflow', icon: '🔄' },
+    ],
+  },
+  {
     label: 'SETTINGS',
     id: 'settings',
     items: [
       { to: '/documents', label: 'Documents', icon: '📄' },
       { to: '/team', label: 'Team', icon: '👥' },
       { to: '/settings', label: 'Settings', icon: '⚙️' },
+      { to: '/help', label: 'Help & Support', icon: '❓' },
     ],
   },
 ];

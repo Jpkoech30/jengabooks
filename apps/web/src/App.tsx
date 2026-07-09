@@ -1,5 +1,5 @@
 import { useEffect, useCallback, useState, lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from './stores/auth-store';
 import { useAuth } from './hooks/use-auth';
@@ -48,8 +48,11 @@ function PageLoading() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-kenya-surface-light dark:bg-kenya-surface-dark">
       <div className="text-center">
-        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-kenya-green-500 text-2xl shadow-lg animate-pulse">
-          📚
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-kenya-green-500 text-2xl shadow-lg animate-fadeIn">
+          <svg className="h-8 w-8 animate-spin text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
         </div>
         <p className="text-gray-500 dark:text-gray-400">Loading page...</p>
       </div>
@@ -58,6 +61,7 @@ function PageLoading() {
 }
 
 function App() {
+  const location = useLocation();
   const isAuthenticated = useAuthStore((state) => state.isAuthenticated);
   const logout = useAuthStore((state) => state.logout);
   const { isLoading } = useAuth();
@@ -134,7 +138,7 @@ function App() {
       <div className="flex-1 flex flex-col min-w-0">
         <Header onToggleSidebar={() => setSidebarOpen((prev) => !prev)} />
         <SyncStatusBanner />
-        <main id="main-content" className="flex-1 overflow-y-auto p-6 scroll-smooth" tabIndex={-1}>
+        <main id="main-content" key={location.pathname} className="flex-1 overflow-y-auto p-6 scroll-smooth animate-fadeIn" tabIndex={-1}>
           <Suspense fallback={<PageLoading />}>
             <Routes>
               <Route path="/" element={<Dashboard />} />
