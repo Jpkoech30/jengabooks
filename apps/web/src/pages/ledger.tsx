@@ -10,6 +10,7 @@ import { Modal } from '../components/ui/modal';
 import { PageShell } from '../components/layout/page-shell';
 import { IncomeForm } from '../components/forms/income-form';
 import { ExpenseForm } from '../components/forms/expense-form';
+import { CommentThread } from '../components/ui/comment-thread';
 import { showToast, useUiStore } from '../stores/ui-store';
 import { t } from '../lib/plain-english';
 import { useQueryClient } from '@tanstack/react-query';
@@ -573,6 +574,12 @@ export function Ledger() {
                 </p>
               </div>
             </div>
+
+            {/* Comments section */}
+            <CommentThread
+              entityType="JOURNAL_ENTRY"
+              entityId={selectedEntry.id}
+            />
           </div>
         )}
       </SlideOutPanel>

@@ -10,6 +10,7 @@ import { PageShell } from '../components/layout/page-shell';
 import { PageState } from '../components/ui/page-state';
 import { EmptyState } from '../components/ui/empty-state';
 import { SlideOutPanel } from '../components/ui/slide-out-panel';
+import { CommentThread } from '../components/ui/comment-thread';
 import { api, apiClient } from '../lib/api-client';
 import { showToast } from '../stores/ui-store';
 import { cn } from '../lib/utils';
@@ -770,6 +771,12 @@ export function MpesaImport() {
                 </span>
               </div>
             </div>
+
+            {/* Comments section */}
+            <CommentThread
+              entityType="MPESA_TRANSACTION"
+              entityId={panelTx.id}
+            />
           </div>
         )}
       </SlideOutPanel>

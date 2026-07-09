@@ -212,3 +212,20 @@ export interface CollaborationTask {
   createdAt: string;
   updatedAt: string;
 }
+
+// ─── Collaboration: Comments ───────────────────────────────────────────────
+
+export type CommentEntityType = 'JOURNAL_ENTRY' | 'MPESA_TRANSACTION';
+
+export interface Comment {
+  id: string;
+  entityType: CommentEntityType;
+  entityId: string;
+  content: string;
+  authorId: string;
+  author: { id: string; name: string };
+  parentId?: string | null;
+  status: 'ACTIVE' | 'RESOLVED';
+  createdAt: string;
+  updatedAt: string;
+}
