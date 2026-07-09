@@ -107,6 +107,8 @@ function App() {
     return (
       <Suspense fallback={<PageLoading />}>
         <Routes>
+          {/* Redirect root to login when not authenticated */}
+          <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           {/* Proper 404 for unknown routes instead of silently redirecting to login */}
