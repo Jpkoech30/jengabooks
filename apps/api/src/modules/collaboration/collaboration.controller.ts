@@ -156,6 +156,18 @@ export class CollaborationController {
   }
 
   /**
+   * GET /api/v1/collab/notifications/count?userId=me
+   * Get unread notification count for a user.
+   * Returns { count: number } — zero allowed, not 404.
+   */
+  @Get('notifications/count')
+  async getUnreadCount(@Req() req: any, @Query('userId') userId: string) {
+    const companyId = req.user.companyId;
+    const targetUserId = userId === 'me' ? req.user.sub || req.user.userId : userId;
+    return this.collabService.getUnreadCount(companyId, targetUserId);
+  }
+
+  /**
    * GET /api/v1/collab/notifications?userId=user_456&status=UNREAD
    * List notifications
    */

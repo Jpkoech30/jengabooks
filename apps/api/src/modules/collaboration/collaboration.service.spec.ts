@@ -402,6 +402,37 @@ describe('CollaborationService', () => {
   //  NOTIFICATIONS
   // ──────────────────────────────────────────────
 
+  describe('getUnreadCount', () => {
+    it('should return the count of unread notifications', async () => {
+      mockPrisma.notification.count.mockResolvedValue(3);
+
+      const result = await service.getUnreadCount(mockCompanyId, 'user_456');
+
+      expect(result).toEqual({ count: 3 });
+      expect(mockPrisma.notification.count).toHaveBeenCalledWith({
+        where: { companyId: mockCompanyId, userId: 'user_456', readAt: null },
+      });
+    });
+
+    it('should return 0 when no unread notifications exist', async () => {
+      mockPrisma.notification.count.mockResolvedValue(0);
+
+      const result = await service.getUnreadCount(mockCompanyId, 'user_456');
+
+      expect(result).toEqual({ count: 0 });
+    });
+
+    it('should handle "me" as userId by using req.user data (controller resolves it)', async () => {
+      // The controller resolves 'me' to the actual userId before calling the service,
+      // so the service only receives resolved userId strings.
+      mockPrisma.notification.count.mockResolvedValue(1);
+
+      const result = await service.getUnreadCount(mockCompanyId, mockUserId);
+
+      expect(result).toEqual({ count: 1 });
+    });
+  });
+
   describe('createNotification', () => {
     it('should create a notification', async () => {
       const dto = {

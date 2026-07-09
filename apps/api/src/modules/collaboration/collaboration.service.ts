@@ -432,6 +432,18 @@ export class CollaborationService {
   // ──────────────────────────────────────────────
 
   /**
+   * Get the count of unread notifications for a user.
+   * Uses readAt IS NULL to determine unread status.
+   * Edge case: zero unread → returns { count: 0 }, not 404.
+   */
+  async getUnreadCount(companyId: string, userId: string) {
+    const count = await this.prisma.notification.count({
+      where: { companyId, userId, readAt: null },
+    });
+    return { count };
+  }
+
+  /**
    * Create a notification.
    * Created even if the user is deleted — they'll see it on next login.
    */
