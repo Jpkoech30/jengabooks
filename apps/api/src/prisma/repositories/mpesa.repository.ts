@@ -11,7 +11,7 @@ export class MpesaRepository extends BaseRepository<any> {
 
     async findUnmapped(companyId: string) {
         return this.prisma.mpesaTransaction.findMany({
-            where: { companyId, mappedAccountId: null, deletedAt: null },
+            where: { companyId, mappedAccountId: null },
             orderBy: { transactionDate: 'desc' },
         });
     }

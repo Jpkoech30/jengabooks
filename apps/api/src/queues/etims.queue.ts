@@ -70,7 +70,7 @@ export class EtimsRetryWorker implements OnModuleInit, OnModuleDestroy {
   constructor(
     @Inject(ETIMS_RETRY_QUEUE) private readonly retryQueue: Queue,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   async onModuleInit(): Promise<void> {
     this.worker = new Worker<EtimsRetryJobData>(
@@ -196,7 +196,7 @@ export class EtimsRetryWorker implements OnModuleInit, OnModuleDestroy {
         if (userId && companyId) {
           try {
             const { GamificationService } = await import('../modules/gamification/gamification.service');
-            const gamification = new GamificationService(null as any);
+            const gamification = new GamificationService(null as any, null as any);
             // We only import for side-effect; the actual awarding happens via direct Prisma call
             // to avoid full DI complexity in the worker
             await this.prisma.xPRecord.create({
@@ -206,7 +206,7 @@ export class EtimsRetryWorker implements OnModuleInit, OnModuleDestroy {
                 points: 30,
                 reason: 'Submitted an eTIMS invoice (retry)',
               },
-            }).catch(() => {});
+            }).catch(() => { });
           } catch { /* non-blocking */ }
         }
       } else if (submissionStatus === 'PENDING') {
