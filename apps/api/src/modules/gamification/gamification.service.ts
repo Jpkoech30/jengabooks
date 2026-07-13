@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { GamificationRepository } from '../../prisma/repositories/gamification.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 // Import shared constants to ensure consistency across the codebase
 import { LEVEL_THRESHOLDS } from '@jengabooks/shared';
@@ -20,7 +21,10 @@ const BADGE_DEFINITIONS = [
 export class GamificationService {
   private readonly logger = new Logger(GamificationService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly gamificationRepo: GamificationRepository,
+    private readonly prisma: PrismaService,
+  ) { }
 
   /**
    * Calculate level and title from total XP using the predefined thresholds
@@ -56,14 +60,12 @@ export class GamificationService {
     badge?: string,
   ) {
     // Create XP record
-    await this.prisma.xPRecord.create({
-      data: {
-        userId,
-        companyId,
-        points,
-        reason,
-        badge: badge || null,
-      },
+    await this.gamificationRepo.create({
+      userId,
+      companyId,
+      points,
+      reason,
+      badge: badge || null,
     });
 
     // Calculate new total

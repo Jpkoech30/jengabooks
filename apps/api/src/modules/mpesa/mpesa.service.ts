@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { MpesaRepository } from '../../prisma/repositories/mpesa.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 import { HitlService } from '../hitl/hitl.service';
@@ -11,12 +12,13 @@ export class MpesaService {
   private readonly logger = new Logger(MpesaService.name);
 
   constructor(
+    private readonly mpesaRepo: MpesaRepository,
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
     private readonly hitlService: HitlService,
     private readonly reconciliationAgent: ReconciliationAgent,
     private readonly darajaService: DarajaService,
-  ) {}
+  ) { }
 
   async uploadCsv(companyId: string, userId: string, csvData: string) {
     // Parse CSV rows
@@ -92,7 +94,7 @@ export class MpesaService {
         companyId,
         xpAmount,
         `Imported ${transactions.length} M-Pesa transactions`,
-      ).catch(() => {});
+      ).catch(() => { });
     }
 
     return {
@@ -187,7 +189,7 @@ export class MpesaService {
     const xpAmount = Math.min(created.length * 2, 25);
     if (created.length > 0 && userId) {
       await this.gamificationService.awardXp(userId, companyId, xpAmount, `Imported ${created.length} transactions from ${source}`)
-        .catch(() => {});
+        .catch(() => { });
     }
 
     const parts = [`Successfully imported ${created.length} transactions from ${source}`];
@@ -829,7 +831,7 @@ export class MpesaService {
           linkedEntityId: tx.id,
           linkedEntityType: 'MPESA_TX',
           confidence: aiResult.confidence || 0,
-        }).catch(() => {});
+        }).catch(() => { });
       } catch (aiError: any) {
         // AI agent failed: fall back to basic HITL creation
         this.logger.warn(`AI agent failed for tx ${tx.id}: ${aiError.message}`);
@@ -840,7 +842,7 @@ export class MpesaService {
           linkedEntityId: tx.id,
           linkedEntityType: 'MPESA_TX',
           confidence: 0,
-        }).catch(() => {});
+        }).catch(() => { });
       }
     }
 

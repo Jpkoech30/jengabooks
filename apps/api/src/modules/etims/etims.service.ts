@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger, Inject } from '@nestjs/common';
+import { InvoiceRepository } from '../../prisma/repositories/invoice.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CircuitBreakerService } from './circuit-breaker.service';
 import { GamificationService } from '../gamification/gamification.service';
@@ -37,6 +38,7 @@ export class EtimsService {
   private redisAvailable = true;
 
   constructor(
+    private readonly invoiceRepo: InvoiceRepository,
     private readonly prisma: PrismaService,
     private readonly circuitBreaker: CircuitBreakerService,
     private readonly gamificationService: GamificationService,
@@ -272,12 +274,12 @@ export class EtimsService {
     // INACTIVE but found
     return {
       kraPin,
-        valid: false,
-        supplierName: (supplierName || 'UNKNOWN SUPPLIER').toUpperCase(),
-        status: 'INACTIVE',
-        registeredDate: '2019-06-01',
-        etimsCompliant: false,
-        validationErrors: ['KRA PIN is registered but INACTIVE. Supplier must renew KRA registration.'],
+      valid: false,
+      supplierName: (supplierName || 'UNKNOWN SUPPLIER').toUpperCase(),
+      status: 'INACTIVE',
+      registeredDate: '2019-06-01',
+      etimsCompliant: false,
+      validationErrors: ['KRA PIN is registered but INACTIVE. Supplier must renew KRA registration.'],
     };
   }
 
@@ -390,7 +392,7 @@ export class EtimsService {
 
     // Submit via circuit breaker
     const submission = await this.circuitBreaker.call(async () => {
-      let kraResponse: { status: string; serialNumber: string; [key: string]: unknown };
+      let kraResponse: { status: string; serialNumber: string;[key: string]: unknown };
       let submissionStatus: string;
       let serialNumber: string;
 
@@ -465,7 +467,7 @@ export class EtimsService {
           companyId,
           30,
           'Submitted an eTIMS invoice',
-        ).catch(() => {});
+        ).catch(() => { });
       }
     } else if (submission.status === 'FAILED') {
       // Schedule retry job with BullMQ delay (TIME-TRAVEL: no Date.now())

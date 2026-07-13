@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { CollaborationRepository } from '../../prisma/repositories/collaboration.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateCommentDto } from './dto/create-comment.dto';
 import { ReplyCommentDto } from './dto/reply-comment.dto';
@@ -14,7 +15,10 @@ import { MarkAllReadDto } from './dto/mark-all-read.dto';
 export class CollaborationService {
   private readonly logger = new Logger(CollaborationService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly collaborationRepo: CollaborationRepository,
+    private readonly prisma: PrismaService,
+  ) { }
 
   // ──────────────────────────────────────────────
   //  COMMENTS

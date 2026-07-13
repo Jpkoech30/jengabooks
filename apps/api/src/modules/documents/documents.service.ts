@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, PayloadTooLargeException } from '@nestjs/common';
+import { DocumentRepository } from '../../prisma/repositories/document.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UploadDocumentDto } from './dto/upload-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -23,7 +24,10 @@ const UPLOAD_DIR = path.join(process.cwd(), 'uploads', 'documents');
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
 
-  constructor(private readonly prisma: PrismaService) {
+  constructor(
+    private readonly documentRepo: DocumentRepository,
+    private readonly prisma: PrismaService,
+  ) {
     // Ensure upload directory exists
     if (!fs.existsSync(UPLOAD_DIR)) {
       fs.mkdirSync(UPLOAD_DIR, { recursive: true });

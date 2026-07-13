@@ -1,4 +1,5 @@
 import { Injectable, Logger, BadRequestException, NotFoundException, Inject } from '@nestjs/common';
+import { StatementRepository } from '../../prisma/repositories/statement.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FileStorageService } from './storage/file-storage.service';
 import { ParserRegistry } from './parsers/parser-registry.service';
@@ -14,7 +15,7 @@ export class StatementsService {
     private readonly fileStorage: FileStorageService,
     private readonly parserRegistry: ParserRegistry,
     @Inject(STATEMENT_UPLOAD_QUEUE) private readonly statementUploadQueue: Queue | null,
-  ) {}
+  ) { }
 
   /**
    * Upload a statement file and enqueue it for async processing.

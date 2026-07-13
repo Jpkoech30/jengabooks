@@ -5,6 +5,7 @@ import {
   ConflictException,
   ForbiddenException,
 } from '@nestjs/common';
+import { AuditRepository } from '../../prisma/repositories/audit.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import * as crypto from 'crypto';
 import { CreateLockDto } from './dto/create-lock.dto';
@@ -13,7 +14,10 @@ import { GrantExternalAccessDto } from './dto/grant-external-access.dto';
 
 @Injectable()
 export class AuditService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly auditRepo: AuditRepository,
+    private readonly prisma: PrismaService,
+  ) { }
 
   // ─── Lock-Down Periods ──────────────────────────────────────────────────
 

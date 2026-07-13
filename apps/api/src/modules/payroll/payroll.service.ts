@@ -1,4 +1,5 @@
 import { Injectable, BadRequestException, NotFoundException, ConflictException, Logger } from '@nestjs/common';
+import { PayrollRepository } from '../../prisma/repositories/payroll.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 
 // ─── KRA 2025/2026 PAYE Tax Brackets (Monthly) ─────────────────────────
@@ -124,7 +125,10 @@ export interface SubmissionResult {
 export class PayrollService {
   private readonly logger = new Logger(PayrollService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly payrollRepo: PayrollRepository,
+    private readonly prisma: PrismaService,
+  ) { }
 
   // ─── Public API: Calculate PAYE for a Single Employee ────────────────
 
