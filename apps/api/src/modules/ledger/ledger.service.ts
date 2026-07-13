@@ -1,39 +1,27 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { LedgerRepository } from '../../prisma/repositories/ledger.repository';
 import { PrismaService } from '../../prisma/prisma.service';
 import { GamificationService } from '../gamification/gamification.service';
 
 @Injectable()
 export class LedgerService {
   constructor(
+    private readonly ledgerRepo: LedgerRepository,
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
-  ) {}
+  ) { }
 
   // ─── Chart of Accounts ─────────────────────────────────────────────────
 
   async findAccounts(companyId: string) {
-    return this.prisma.chartOfAccount.findMany({
-      where: { companyId, deletedAt: null },
-      orderBy: { code: 'asc' },
-      include: {
-        children: { where: { deletedAt: null } },
-      },
-    });
+    return this.ledgerRepo.findMany({ companyId } as any);
   }
 
   async findAccount(id: string) {
-    const account = await this.prisma.chartOfAccount.findFirst({
-      where: { id, deletedAt: null },
-      include: {
-        parent: true,
-        children: { where: { deletedAt: null } },
-      },
-    });
-
+    const account = await this.ledgerRepo.findById(id);
     if (!account) {
       throw new NotFoundException(`Account with id ${id} not found`);
     }
-
     return account;
   }
 
@@ -45,9 +33,7 @@ export class LedgerService {
   }) {
     // Validate parent if provided
     if (data.parentId) {
-      const parent = await this.prisma.chartOfAccount.findFirst({
-        where: { id: data.parentId, companyId, deletedAt: null },
-      });
+      const parent = await this.ledgerRepo.findById(data.parentId);
       if (!parent) {
         throw new NotFoundException(`Parent account ${data.parentId} not found`);
       }
@@ -61,47 +47,28 @@ export class LedgerService {
       throw new BadRequestException(`Account code ${data.code} already exists for this company`);
     }
 
-    return this.prisma.chartOfAccount.create({
-      data: {
-        companyId,
-        code: data.code,
-        name: data.name,
-        type: data.type,
-        parentId: data.parentId,
-      },
+    return this.ledgerRepo.create({
+      companyId,
+      code: data.code,
+      name: data.name,
+      type: data.type,
+      parentId: data.parentId,
     });
   }
 
   async updateAccount(id: string, data: { name?: string; isActive?: boolean; parentId?: string }) {
-    const account = await this.prisma.chartOfAccount.findFirst({
-      where: { id, deletedAt: null },
-    });
-    if (!account) {
-      throw new NotFoundException(`Account with id ${id} not found`);
-    }
-
-    return this.prisma.chartOfAccount.update({
-      where: { id },
-      data,
-    });
+    return this.ledgerRepo.update(id, data);
   }
 
   async deleteAccount(id: string) {
-    const account = await this.prisma.chartOfAccount.findFirst({
-      where: { id, deletedAt: null },
-      include: { children: { where: { deletedAt: null } } },
-    });
+    const account = await this.ledgerRepo.findById(id);
     if (!account) {
       throw new NotFoundException(`Account with id ${id} not found`);
     }
-    if (account.children.length > 0) {
+    if (account.children && account.children.length > 0) {
       throw new BadRequestException('Cannot delete account with active child accounts');
     }
-
-    return this.prisma.chartOfAccount.update({
-      where: { id },
-      data: { deletedAt: new Date(), isActive: false },
-    });
+    return this.ledgerRepo.delete(id);
   }
 
   // ─── Journal Entries (Double-Entry) ────────────────────────────────────
@@ -232,7 +199,7 @@ export class LedgerService {
       companyId,
       10,
       'Recorded a journal entry',
-    ).catch(() => {});
+    ).catch(() => { });
 
     return entry;
   }
@@ -404,7 +371,7 @@ export class LedgerService {
       companyId,
       10,
       'Recorded income',
-    ).catch(() => {});
+    ).catch(() => { });
 
     return entry;
   }
@@ -500,7 +467,7 @@ export class LedgerService {
       companyId,
       10,
       'Recorded an expense',
-    ).catch(() => {});
+    ).catch(() => { });
 
     return entry;
   }
@@ -514,7 +481,7 @@ export class LedgerService {
   private async generateSerialNumber(companyId: string, prefix: string, now?: Date): Promise<string> {
     const today = now || new Date();
     const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '');
-    
+
     // Count existing entries with today's prefix to get the sequence number
     const count = await this.prisma.journalEntry.count({
       where: {
@@ -524,7 +491,7 @@ export class LedgerService {
         },
       },
     });
-    
+
     return `${prefix}-${dateStr}-${String(count + 1).padStart(5, '0')}`;
   }
 }
