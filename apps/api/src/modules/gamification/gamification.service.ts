@@ -78,15 +78,9 @@ export class GamificationService {
     const levelInfo = GamificationService.calculateLevel(newTotal);
 
     // Upsert user level
-    const userLevel = await this.prisma.userLevel.upsert({
-      where: { userId_companyId: { userId, companyId } },
-      update: { totalXp: newTotal, level: levelInfo.level },
-      create: {
-        userId,
-        companyId,
-        totalXp: newTotal,
-        level: levelInfo.level,
-      },
+    const userLevel = await this.gamificationRepo.upsertUserLevel(userId, companyId, {
+      totalXp: newTotal,
+      level: levelInfo.level,
     });
 
     this.logger.log(`Awarded ${points} XP to user ${userId} for ${reason}. New total: ${newTotal}, Level: ${levelInfo.level}`);
@@ -111,25 +105,15 @@ export class GamificationService {
     // Check and auto-award any new badges based on activity
     await this.checkAndAwardBadges(userId, companyId);
 
-    const userLevel = await this.prisma.userLevel.findUnique({
-      where: { userId_companyId: { userId, companyId } },
-    });
+    const userLevel = await this.gamificationRepo.getUserLevel(userId, companyId);
 
     const totalXp = userLevel?.totalXp || 0;
     const levelInfo = GamificationService.calculateLevel(totalXp);
 
-    const recentXp = await this.prisma.xPRecord.findMany({
-      where: { userId, companyId },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
+    const recentXp = await this.gamificationRepo.findMany({ userId, companyId } as any);
 
     // Get earned badges (badges with non-null badge field in XPRecord)
-    const earnedBadgeRecords = await this.prisma.xPRecord.findMany({
-      where: { userId, companyId, badge: { not: null } },
-      distinct: ['badge'],
-      select: { badge: true, createdAt: true },
-    });
+    const earnedBadgeRecords = await this.gamificationRepo.findMany({ userId, companyId, badge: { not: null } } as any);
 
     const earnedBadges = earnedBadgeRecords
       .filter((r) => r.badge)
