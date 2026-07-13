@@ -9,10 +9,49 @@ export class ReportsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly gamificationService: GamificationService,
-  ) {}
+  ) { }
 
-  async getProfitLoss(companyId: string, userId: string, fromDate?: string, toDate?: string, now?: Date) {
+  async getProfitLoss(
+    companyId: string,
+    userId: string,
+    fromDate?: string,
+    toDate?: string,
+    now?: Date,
+    compareWithPrevious?: boolean,
+  ) {
     const timestamp = now || new Date();
+    const currentPeriod = await this.computePnl(companyId, fromDate, toDate);
+
+    let previousPeriod = null;
+    if (compareWithPrevious) {
+      const prevFrom = this.offsetPeriod(fromDate, toDate, true);
+      const prevTo = fromDate;
+      previousPeriod = await this.computePnl(companyId, prevFrom, prevTo);
+    }
+
+    if (fromDate || toDate) {
+      await this.gamificationService.awardXp(userId, companyId, 5, 'Generated a Profit & Loss report').catch(() => { });
+    }
+
+    return {
+      period: { from: fromDate || 'All time', to: toDate || 'All time' },
+      ...currentPeriod,
+      ...(compareWithPrevious && previousPeriod ? {
+        previousPeriod: {
+          period: { from: this.offsetPeriod(fromDate, toDate, true), to: fromDate || 'All time' },
+          ...previousPeriod,
+        },
+        changes: {
+          totalIncome: this.pctChange(currentPeriod.totalIncome, previousPeriod.totalIncome),
+          totalExpenses: this.pctChange(currentPeriod.totalExpenses, previousPeriod.totalExpenses),
+          netIncome: this.pctChange(currentPeriod.netIncome, previousPeriod.netIncome),
+        },
+      } : {}),
+      generatedAt: timestamp.toISOString(),
+    };
+  }
+
+  private async computePnl(companyId: string, fromDate?: string, toDate?: string) {
     const where: any = { companyId, deletedAt: null };
     if (fromDate || toDate) {
       where.entryDate = {};
@@ -22,12 +61,9 @@ export class ReportsService {
 
     const entries = await this.prisma.journalEntry.findMany({
       where,
-      include: {
-        account: { select: { id: true, code: true, name: true, type: true } },
-      },
+      include: { account: { select: { id: true, code: true, name: true, type: true } } },
     });
 
-    // Group by account type
     const incomeMap = new Map<string, { code: string; name: string; amount: number }>();
     const expenseMap = new Map<string, { code: string; name: string; amount: number }>();
 
@@ -49,40 +85,41 @@ export class ReportsService {
     const totalIncome = income.reduce((sum, a) => sum + a.amount, 0);
     const totalExpenses = expenses.reduce((sum, a) => sum + a.amount, 0);
     const netIncome = totalIncome - totalExpenses;
+    return { income, expenses, totalIncome, totalExpenses, netIncome };
+  }
 
-    // Award XP for generating a report (once per hour limit to prevent spam)
-    if (fromDate || toDate) {
-      await this.gamificationService.awardXp(
-        userId,
-        companyId,
-        5,
-        'Generated a Profit & Loss report',
-      ).catch(() => {});
+  async getBalanceSheet(companyId: string, asOf?: string, now?: Date, compareWithPrevious?: boolean) {
+    const timestamp = now || new Date();
+    const currentPeriod = await this.computeBalanceSheet(companyId, asOf);
+
+    let previousPeriod = null;
+    if (compareWithPrevious && asOf) {
+      const prevAsOf = this.offsetDate(asOf, true);
+      previousPeriod = await this.computeBalanceSheet(companyId, prevAsOf);
     }
 
     return {
-      period: { from: fromDate || 'All time', to: toDate || 'All time' },
-      income,
-      expenses,
-      totalIncome,
-      totalExpenses,
-      netIncome,
+      asOf: asOf || timestamp.toISOString(),
+      ...currentPeriod,
+      ...(compareWithPrevious && previousPeriod ? {
+        previousPeriod: { asOf: this.offsetDate(asOf, true), ...previousPeriod },
+        changes: {
+          totalAssets: this.pctChange(currentPeriod.totalAssets, previousPeriod.totalAssets),
+          totalLiabilities: this.pctChange(currentPeriod.totalLiabilities, previousPeriod.totalLiabilities),
+          totalEquity: this.pctChange(currentPeriod.totalEquity, previousPeriod.totalEquity),
+        },
+      } : {}),
       generatedAt: timestamp.toISOString(),
     };
   }
 
-  async getBalanceSheet(companyId: string, asOf?: string, now?: Date) {
-    const timestamp = now || new Date();
+  private async computeBalanceSheet(companyId: string, asOf?: string) {
     const where: any = { companyId, deletedAt: null };
-    if (asOf) {
-      where.entryDate = { lte: new Date(asOf) };
-    }
+    if (asOf) where.entryDate = { lte: new Date(asOf) };
 
     const entries = await this.prisma.journalEntry.findMany({
       where,
-      include: {
-        account: { select: { id: true, code: true, name: true, type: true } },
-      },
+      include: { account: { select: { id: true, code: true, name: true, type: true } } },
     });
 
     const assetMap = new Map<string, { code: string; name: string; balance: number }>();
@@ -113,32 +150,17 @@ export class ReportsService {
     const totalLiabilities = liabilities.reduce((sum, a) => sum + a.balance, 0);
     const totalEquity = equity.reduce((sum, a) => sum + a.balance, 0);
 
-    return {
-      asOf: asOf || timestamp.toISOString(),
-      assets,
-      liabilities,
-      equity,
-      totalAssets,
-      totalLiabilities,
-      totalEquity,
-      accountingEquation: `${totalAssets} = ${totalLiabilities} + ${totalEquity}`,
-      balanced: Math.abs(totalAssets - (totalLiabilities + totalEquity)) < 0.01,
-      generatedAt: timestamp.toISOString(),
-    };
+    return { assets, liabilities, equity, totalAssets, totalLiabilities, totalEquity };
   }
 
-  async getTrialBalance(companyId: string, asOf?: string, now?: Date) {
+  async getTrialBalance(companyId: string, asOf?: string, now?: Date, compareWithPrevious?: boolean) {
     const timestamp = now || new Date();
     const where: any = { companyId, deletedAt: null };
-    if (asOf) {
-      where.entryDate = { lte: new Date(asOf) };
-    }
+    if (asOf) where.entryDate = { lte: new Date(asOf) };
 
     const entries = await this.prisma.journalEntry.findMany({
       where,
-      include: {
-        account: { select: { id: true, code: true, name: true, type: true } },
-      },
+      include: { account: { select: { id: true, code: true, name: true, type: true } } },
     });
 
     const balanceMap = new Map<string, { code: string; name: string; type: string; debit: number; credit: number }>();
@@ -146,17 +168,10 @@ export class ReportsService {
     for (const entry of entries) {
       const key = entry.accountId;
       const current = balanceMap.get(key) || {
-        code: entry.account.code,
-        name: entry.account.name,
-        type: entry.account.type,
-        debit: 0,
-        credit: 0,
+        code: entry.account.code, name: entry.account.name, type: entry.account.type, debit: 0, credit: 0,
       };
-      if (entry.direction === 'DEBIT') {
-        current.debit += entry.amount;
-      } else {
-        current.credit += entry.amount;
-      }
+      if (entry.direction === 'DEBIT') current.debit += entry.amount;
+      else current.credit += entry.amount;
       balanceMap.set(key, current);
     }
 
@@ -165,17 +180,44 @@ export class ReportsService {
     const totalCredits = accounts.reduce((sum, a) => sum + a.credit, 0);
 
     return {
-      accounts,
-      totalDebits,
-      totalCredits,
+      accounts, totalDebits, totalCredits,
       balanced: Math.abs(totalDebits - totalCredits) < 0.01,
       asOf: asOf || timestamp.toISOString(),
       generatedAt: timestamp.toISOString(),
     };
   }
 
-  async getCashFlow(companyId: string, fromDate?: string, toDate?: string, now?: Date) {
+  async getCashFlow(companyId: string, fromDate?: string, toDate?: string, now?: Date, compareWithPrevious?: boolean) {
     const timestamp = now || new Date();
+    const currentPeriod = await this.computeCashFlow(companyId, fromDate, toDate);
+
+    let previousPeriod = null;
+    if (compareWithPrevious) {
+      const prevFrom = this.offsetPeriod(fromDate, toDate, true);
+      const prevTo = fromDate;
+      previousPeriod = await this.computeCashFlow(companyId, prevFrom, prevTo);
+    }
+
+    return {
+      period: { from: fromDate || 'All time', to: toDate || 'All time' },
+      ...currentPeriod,
+      ...(compareWithPrevious && previousPeriod ? {
+        previousPeriod: {
+          period: { from: this.offsetPeriod(fromDate, toDate, true), to: fromDate || 'All time' },
+          ...previousPeriod,
+        },
+        changes: {
+          netOperating: this.pctChange(currentPeriod.operating.net, previousPeriod.operating.net),
+          netInvesting: this.pctChange(currentPeriod.investing.net, previousPeriod.investing.net),
+          netFinancing: this.pctChange(currentPeriod.financing.net, previousPeriod.financing.net),
+          netCashChange: this.pctChange(currentPeriod.netCashChange, previousPeriod.netCashChange),
+        },
+      } : {}),
+      generatedAt: timestamp.toISOString(),
+    };
+  }
+
+  private async computeCashFlow(companyId: string, fromDate?: string, toDate?: string) {
     const where: any = { companyId, deletedAt: null };
     if (fromDate || toDate) {
       where.entryDate = {};
@@ -185,20 +227,13 @@ export class ReportsService {
 
     const entries = await this.prisma.journalEntry.findMany({
       where,
-      include: {
-        account: { select: { id: true, code: true, name: true, type: true } },
-      },
+      include: { account: { select: { id: true, code: true, name: true, type: true } } },
     });
 
-    // Cash accounts are typically codes starting with 1 (assets) that represent cash/bank/M-Pesa
     const cashAccountCodes = ['1001', '1002', '1003', '1101', '1102', '1103', '1201'];
-
-    let operatingInflow = 0;
-    let operatingOutflow = 0;
-    let investingInflow = 0;
-    let investingOutflow = 0;
-    let financingInflow = 0;
-    let financingOutflow = 0;
+    let operatingInflow = 0, operatingOutflow = 0;
+    let investingInflow = 0, investingOutflow = 0;
+    let financingInflow = 0, financingOutflow = 0;
 
     for (const entry of entries) {
       const isCashAccount = cashAccountCodes.includes(entry.account.code);
@@ -206,22 +241,12 @@ export class ReportsService {
       const isExpense = entry.account.type === 'EXPENSE';
 
       if (isCashAccount) {
-        // Direct cash movement
-        if (entry.direction === 'DEBIT') {
-          operatingInflow += entry.amount; // Cash received
-        } else {
-          operatingOutflow += entry.amount; // Cash paid out
-        }
+        if (entry.direction === 'DEBIT') operatingInflow += entry.amount;
+        else operatingOutflow += entry.amount;
       } else if (isIncome) {
-        // Income increases cash (simplified)
-        if (entry.direction === 'CREDIT') {
-          operatingInflow += entry.amount;
-        }
+        if (entry.direction === 'CREDIT') operatingInflow += entry.amount;
       } else if (isExpense) {
-        // Expenses decrease cash (simplified)
-        if (entry.direction === 'DEBIT') {
-          operatingOutflow += entry.amount;
-        }
+        if (entry.direction === 'DEBIT') operatingOutflow += entry.amount;
       }
     }
 
@@ -231,24 +256,10 @@ export class ReportsService {
     const netCashChange = netOperating + netInvesting + netFinancing;
 
     return {
-      period: { from: fromDate || 'All time', to: toDate || 'All time' },
-      operating: {
-        inflows: operatingInflow,
-        outflows: operatingOutflow,
-        net: netOperating,
-      },
-      investing: {
-        inflows: investingInflow,
-        outflows: investingOutflow,
-        net: netInvesting,
-      },
-      financing: {
-        inflows: financingInflow,
-        outflows: financingOutflow,
-        net: netFinancing,
-      },
+      operating: { inflows: operatingInflow, outflows: operatingOutflow, net: netOperating },
+      investing: { inflows: investingInflow, outflows: investingOutflow, net: netInvesting },
+      financing: { inflows: financingInflow, outflows: financingOutflow, net: netFinancing },
       netCashChange,
-      generatedAt: timestamp.toISOString(),
     };
   }
 
@@ -256,27 +267,40 @@ export class ReportsService {
     const timestamp = now || new Date();
     const take = options?.limit || 50;
     const skip = options?.offset || 0;
-
     const where: any = { companyId };
     if (options?.entityType) where.entityType = options.entityType;
 
     const [items, total] = await Promise.all([
       this.prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        take,
-        skip,
+        where, orderBy: { createdAt: 'desc' }, take, skip,
         include: { user: { select: { id: true, name: true, email: true } } },
       }),
       this.prisma.auditLog.count({ where }),
     ]);
 
-    return {
-      items,
-      total,
-      limit: take,
-      offset: skip,
-      generatedAt: timestamp.toISOString(),
-    };
+    return { items, total, limit: take, offset: skip, generatedAt: timestamp.toISOString() };
+  }
+
+  private pctChange(current: number, previous: number): { amount: number; percentage: number | null } {
+    const amount = current - previous;
+    const percentage = previous !== 0 ? Math.round((amount / previous) * 10000) / 100 : null;
+    return { amount, percentage };
+  }
+
+  private offsetPeriod(fromDate?: string, toDate?: string, isStart?: boolean): string | undefined {
+    if (!fromDate) return undefined;
+    const from = new Date(fromDate);
+    const to = toDate ? new Date(toDate) : new Date();
+    const diffMs = to.getTime() - from.getTime();
+    const prevFrom = new Date(from.getTime() - diffMs);
+    return isStart ? prevFrom.toISOString().split('T')[0] : fromDate;
+  }
+
+  private offsetDate(asOf: string, isStart?: boolean): string | undefined {
+    if (!asOf) return undefined;
+    const date = new Date(asOf);
+    // Offset by the same number of days back
+    const prev = new Date(date.getTime() - (date.getTime() - new Date(0).getTime()));
+    return prev.toISOString().split('T')[0];
   }
 }

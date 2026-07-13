@@ -28,6 +28,7 @@ import { CashflowModule } from './modules/cashflow/cashflow.module';
 import { BillingModule } from './modules/billing/billing.module';
 import { SandboxModule } from './modules/sandbox/sandbox.module';
 import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
+import { RecurringJournalModule } from './modules/recurring-journal/recurring-journal.module';
 
 @Module({
   imports: [
@@ -70,6 +71,7 @@ import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
     BillingModule,
     SandboxModule,
     WhatsAppModule,
+    RecurringJournalModule,
   ],
   providers: [
     {
@@ -78,4 +80,4 @@ import { WhatsAppModule } from './modules/whatsapp/whatsapp.module';
     },
   ],
 })
-export class AppModule {}
+export class AppModule { }

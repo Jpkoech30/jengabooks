@@ -42,6 +42,7 @@ model Company {
   comments          Comment[]
   clientTasks       ClientTask[]
   notifications     Notification[]
+  recurringJournalTemplates RecurringJournalTemplate[]
   sandbox           Sandbox?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -80,6 +81,7 @@ model User {
   auditLocksLocked     AuditLock[] @relation("AuditLockLocker")
   unlockRequestedLocks AuditLock[] @relation("AuditLockUnlocker")
   externalAccessGrants ExternalAccess[]
+  recurringJournalTemplates RecurringJournalTemplate[]
   @@map("users")
 }
 
@@ -283,6 +285,9 @@ model UserLevel {
   company   Company  @relation(fields: [companyId], references: [id])
   level     Int      @default(1)
   totalXp   Int      @default(0)
+  lastLoginAt DateTime?   // For Sync Streak tracking
+  streakDays  Int         @default(0)  // Consecutive login days
+  longestStreak Int       @default(0)  // Longest streak ever achieved
   updatedAt DateTime @updatedAt
   @@unique([userId, companyId])
   @@map("user_levels")
@@ -737,6 +742,33 @@ model ExternalAccessLog {
   @@map("external_access_logs")
 }
 
+/// Recurring journal templates for auto-generating journal entries on a schedule.
+/// Supports DAILY, WEEKLY, MONTHLY, QUARTERLY, and YEARLY frequencies.
+model RecurringJournalTemplate {
+  id          String    @id @default(uuid())
+  companyId   String
+  company     Company   @relation(fields: [companyId], references: [id])
+  name        String
+  description String    @default("")
+  frequency   String    // DAILY | WEEKLY | MONTHLY | QUARTERLY | YEARLY
+  entries     Json      // Array of { accountId, description, amount, direction }
+  startDate   DateTime
+  endDate     DateTime?
+  lastRunDate DateTime?
+  nextRunDate DateTime?
+  dayOfMonth  Int?      // For MONTHLY: 1-31
+  dayOfWeek   Int?      // For WEEKLY: 0=Sunday
+  isActive    Boolean   @default(true)
+  createdById String
+  createdBy   User      @relation(fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([companyId, isActive])
+  @@index([companyId, nextRunDate])
+  @@index([nextRunDate])
+  @@map("recurring_journal_templates")
+}
 
 model Sandbox {
   id         String   @id @default(uuid())

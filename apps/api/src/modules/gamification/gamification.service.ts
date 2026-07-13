@@ -27,6 +27,75 @@ export class GamificationService {
   ) { }
 
   /**
+   * Track user login for Sync Streak calculation.
+   * Called when a user logs in or refreshes their token.
+   * Returns the updated streak info.
+   */
+  async trackLogin(userId: string, companyId: string): Promise<{
+    streakDays: number;
+    longestStreak: number;
+    isNewStreak: boolean;
+    xpAwarded: number;
+  }> {
+    const userLevel = await this.gamificationRepo.getUserLevel(userId, companyId);
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (!userLevel) {
+      // First login — create level entry with streak=1
+      await this.prisma.userLevel.create({
+        data: {
+          userId, companyId,
+          level: 1, totalXp: 0,
+          lastLoginAt: now,
+          streakDays: 1,
+          longestStreak: 1,
+        },
+      });
+      await this.awardXp(userId, companyId, 5, 'First login of the day (Sync Streak)');
+      return { streakDays: 1, longestStreak: 1, isNewStreak: true, xpAwarded: 5 };
+    }
+
+    const lastLogin = userLevel.lastLoginAt
+      ? new Date(new Date(userLevel.lastLoginAt).getFullYear(), new Date(userLevel.lastLoginAt).getMonth(), new Date(userLevel.lastLoginAt).getDate())
+      : null;
+
+    const isToday = lastLogin && lastLogin.getTime() === today.getTime();
+
+    if (isToday) {
+      // Already logged in today — no streak change
+      return { streakDays: userLevel.streakDays || 0, longestStreak: userLevel.longestStreak || 0, isNewStreak: false, xpAwarded: 0 };
+    }
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const isConsecutive = lastLogin && lastLogin.getTime() === yesterday.getTime();
+
+    let streakDays = 1;
+    if (isConsecutive) {
+      streakDays = (userLevel.streakDays || 0) + 1;
+    }
+
+    const longestStreak = Math.max(streakDays, userLevel.longestStreak || 0);
+    let xpAwarded = 5;
+
+    // Bonus XP for milestone streaks
+    if (streakDays === 7) xpAwarded = 25;
+    else if (streakDays === 30) xpAwarded = 100;
+    else if (streakDays === 100) xpAwarded = 500;
+    else if (streakDays % 10 === 0) xpAwarded = 10;
+
+    await this.prisma.userLevel.update({
+      where: { userId_companyId: { userId, companyId } },
+      data: { lastLoginAt: now, streakDays, longestStreak },
+    });
+
+    await this.awardXp(userId, companyId, xpAwarded, `Sync Streak: ${streakDays} consecutive days`);
+
+    return { streakDays, longestStreak, isNewStreak: true, xpAwarded };
+  }
+
+  /**
    * Calculate level and title from total XP using the predefined thresholds
    */
   static calculateLevel(totalXp: number): { level: number; title: string; xpToNextLevel: number } {

@@ -9,31 +9,34 @@ export class ReportsController {
   constructor(
     private readonly reportsService: ReportsService,
     private readonly prisma: PrismaService,
-  ) {}
+  ) { }
 
   @Get('profit-loss')
   getProfitLoss(
     @Req() req: any,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('compareWithPrevious') compareWithPrevious?: string,
   ) {
-    return this.reportsService.getProfitLoss(req.user.companyId, req.user.userId, from, to);
+    return this.reportsService.getProfitLoss(req.user.companyId, req.user.userId, from, to, undefined, compareWithPrevious === 'true');
   }
 
   @Get('balance-sheet')
   getBalanceSheet(
     @Req() req: any,
     @Query('asOf') asOf?: string,
+    @Query('compareWithPrevious') compareWithPrevious?: string,
   ) {
-    return this.reportsService.getBalanceSheet(req.user.companyId, asOf);
+    return this.reportsService.getBalanceSheet(req.user.companyId, asOf, undefined, compareWithPrevious === 'true');
   }
 
   @Get('trial-balance')
   getTrialBalance(
     @Req() req: any,
     @Query('asOf') asOf?: string,
+    @Query('compareWithPrevious') compareWithPrevious?: string,
   ) {
-    return this.reportsService.getTrialBalance(req.user.companyId, asOf);
+    return this.reportsService.getTrialBalance(req.user.companyId, asOf, undefined, compareWithPrevious === 'true');
   }
 
   @Get('cash-flow')
@@ -41,8 +44,9 @@ export class ReportsController {
     @Req() req: any,
     @Query('from') from?: string,
     @Query('to') to?: string,
+    @Query('compareWithPrevious') compareWithPrevious?: string,
   ) {
-    return this.reportsService.getCashFlow(req.user.companyId, from, to);
+    return this.reportsService.getCashFlow(req.user.companyId, from, to, undefined, compareWithPrevious === 'true');
   }
 
   @Get('audit-trail')
